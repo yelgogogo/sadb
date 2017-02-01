@@ -2,7 +2,7 @@
     var app = express(); 
     var bodyParser = require('body-parser');
     var multer = require('multer');
-    var rf=require("fs");  
+    var fs=require("fs");  
     var zlib = require('zlib'); 
     var gzip = zlib.createGzip(); 
     var fstream = require('fstream');
@@ -31,7 +31,7 @@
         filename: function (req, file, cb) {
             var datetimestamp = Date.now();
             console.log(file);
-            cb(null, file.originalname);
+            cb(null, file.originalname+'-' + datetimestamp);
         }
     });
 
@@ -40,21 +40,176 @@
                 }).single('file');
 
     
-    app.post('/upload', function(req, res) {
+    app.post('/upload/', function(req, res) {
         upload(req,res,function(err){
 			console.log(req.file);
             if(err){
-                 res.json({error_code:1,err_desc:err});
-                 return;
+                res.json({error_code:1,err_desc:err});
+                return;
             }
-             res.json({error_code:0,err_desc:null,destination:req.file.destination,filename:req.file.filename,path:req.file.path});
+            var createTime = new Date();
+            res.json({error_code:0,err_desc:null,createTime:createTime.toLocaleString(),destination:req.file.destination,filename:req.file.filename,path:req.file.path});
         });
     });
 
+    var workspacesDB = 'db/workspacesdb.txt';
+    app.put('/workspaces/:wid', function(req, res) {
+        fs.readFile(workspacesDB,'utf-8',function(err,data){  
+            if(err){  
+                console.log("error");  
+            }else{ 
+                console.log(req.params); 
+                var wsDB = JSON.parse(data);
+                var f1 = wsDB.findIndex(function(element){return element.id == req.params.wid;});
+                wsDB[f1] = req.body;
+
+                fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
+                    if(err)  
+                        console.log("fail " + err);  
+                    else  
+                        console.log("write file ok"); 
+                        res.json(wsDB);
+                });  
+            }
+        });    
+    });
+
+    app.delete('/workspaces/:did', function(req, res) {
+        fs.readFile(workspacesDB,'utf-8',function(err,data){  
+            if(err){  
+                console.log("error");  
+            }else{ 
+                console.log(req.params); 
+                var wsDB = JSON.parse(data);
+                var f2 = wsDB.findIndex(function(element){return element.id == req.params.did});
+                var delworkspace = wsDB[f2]; 
+                wsDB.splice(f2, 1);
+
+                fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
+                    if(err)  
+                        console.log("fail " + err);  
+                    else  
+                        console.log("write file ok"); 
+                        res.json(delworkspace);
+                });  
+            }
+        });    
+    });
+
+    app.post('/workspaces', function(req, res) {
+        fs.readFile(workspacesDB,'utf-8',function(err,data){  
+            if(err){  
+                console.log("error");  
+            }else{ 
+                console.log(req.params); 
+                var i=1;
+                var wsDB = JSON.parse(data);
+                var postw = req.body;
+                postw.id=wsDB[wsDB.length-1].id+1;
+                wsDB.push( req.body);
+
+                fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
+                    if(err)  
+                        console.log("fail " + err);  
+                    else  
+                        console.log("write file ok"); 
+                        res.json(wsDB);
+                });  
+            }
+        });    
+    });
+//--------------regs-start------------------------------
+    // Add new Regarray
+    var regsDB = 'db/regsdb.txt';
+    app.get('/regs', function(req, res){
+        fs.readFile(regsDB,'utf-8',function(err,data){  
+            if(err){  
+                console.log(err);     
+                // throw err;
+            }else{ 
+                res.send(data);        
+            }
+        }); 
+    });
+    // Update existing Regarray
+    app.put('/regs/:wid', function(req, res) {
+        fs.readFile(regsDB,'utf-8',function(err,data){  
+            if(err){  
+                console.log("error");  
+            }else{ 
+
+                var wsDB = JSON.parse(data);
+                var f3 = wsDB.findIndex(function(element){return element.id == req.params.wid;});
+                if (f3 < 0){
+                    res.json(wsDB);
+                }else{
+                    wsDB[f3] = req.body;
+                    fs.writeFile(regsDB, JSON.stringify(wsDB), function(err){  
+                        if(err){  
+                            console.log("fail " + err);  
+                        }else{  
+                            console.log("write file ok"); 
+                            res.json(wsDB);
+                        }
+                    });  
+                }
+
+            }
+        });    
+    });
+
+    app.delete('/regs/:did', function(req, res) {
+        fs.readFile(regsDB,'utf-8',function(err,data){  
+            if(err){  
+                console.log("error");  
+            }else{ 
+                console.log(req.params); 
+                var wsDB = JSON.parse(data);
+                var f2 = wsDB.findIndex(function(element){return element.id == req.params.did;});
+                var delworkspace = wsDB[f2]; 
+                console.log(f2+'|'+req.params.did);
+                console.log(wsDB);
+                wsDB.splice(f2, 1);
+                console.log(wsDB);
+                fs.writeFile(regsDB, JSON.stringify(wsDB), function(err){  
+                    if(err)  
+                        console.log("fail " + err);  
+                    else  
+                        console.log("write file ok"); 
+                        res.json(delworkspace);
+                });  
+            }
+        });    
+    });
+
+    app.post('/regs', function(req, res) {
+        fs.readFile(regsDB,'utf-8',function(err,data){  
+            if(err){  
+                console.log("error");  
+            }else{ 
+                console.log(req.params); 
+                var i=1;
+                var wsDB = JSON.parse(data);
+                var postw = req.body;
+                postw.id=wsDB[wsDB.length-1].id+1;
+                wsDB.push( req.body);
+
+                fs.writeFile(regsDB, JSON.stringify(wsDB), function(err){  
+                    if(err)  
+                        console.log("fail " + err);  
+                    else  
+                        console.log("write file ok"); 
+                        res.json(wsDB);
+                });  
+            }
+        });    
+    });
+//--------------regs-end------------------------------
     app.get('/download', function(req, res){
-        var fileDownload = './'+rapper.workSpace; 
-        // var inp = rf.createReadStream(fileDownload); 
-        // var out = rf.createWriteStream(workSpace.name+'.gz'); 
+        var downzip = JSON.parse(req.query.workSpace);
+        var fileDownload = './'+downzip.name; 
+        // var inp = fs.createReadStream(fileDownload); 
+        // var out = fs.createWriteStream(workSpace.name+'.gz'); 
         // inp.pipe(gzip).pipe(out); 
         fstream.Reader({ 'path': fileDownload, 'type': 'Directory' }) /* Read the source directory */
         .pipe(tar.Pack()) /* Convert the directory to a .tar file */
@@ -63,88 +218,130 @@
         res.download(rapper.workSpace+'.tar.gz'); // Set disposition and send it.
     });
 
+    app.get('/workspaces', function(req, res){
+        fs.readFile(workspacesDB,'utf-8',function(err,data){  
+            if(err){  
+                console.log( err); 
+            }else{ 
+                res.send(data);        
+            }
+        });       
+    });
 
-    // app.get('/', function(req, res){
-    //   res.send(`<ul> 
-    //      <li>Download <a href="/uploads/file-1484452575347.JCL">file1</a>.</li>
-    //      <li>Download <a href="/uploads/file-1484452585234.JPG">missing.txt</a>.</li>
-    //      </ul> `);
-    // });
+    var usersDB = 'db/usersdb.txt';
+    app.get('/users', function(req, res){
+        fs.readFile(usersDB,'utf-8',function(err,data){  
+            if(err){  
+                console.log(err);     
+                // throw err;
+            }else{ 
+                res.send(data);        
+            }
+        }); 
+    });
 
-    var regArray = [
-            {id:1,enable:true,regScope : 'atest.',regScopeAttr : 'g',regFind : 'aaa',regFindAttr : 'i',regReplace : 'ReplaceA'},
-            {id:2,enable:true,regScope : 'btest..',regScopeAttr : 'g',regFind : 'bbb',regFindAttr : 'i',regReplace : 'ReplaceBB'},
-            {id:3,enable:true,regScope : 'ctest...',regScopeAttr : 'g',regFind : 'ccc',regFindAttr : 'i',regReplace : 'ReplaceCCC'}
-            ];
-    var rapper = {id:1,workSpace:'AAA',file:'./uploads/readme.txt',regArray:regArray};
+
+    // var regArray = [
+    //         {id:1,enable:true,regScope : 'atest.',regScopeAttr : 'g',regFind : 'aaa',regFindAttr : 'i',regReplace : 'ReplaceA'},
+    //         {id:2,enable:true,regScope : 'btest..',regScopeAttr : 'g',regFind : 'bbb',regFindAttr : 'i',regReplace : 'ReplaceBB'},
+    //         {id:3,enable:true,regScope : 'ctest...',regScopeAttr : 'g',regFind : 'ccc',regFindAttr : 'i',regReplace : 'ReplaceCCC'}
+    //         ];
+    // var rapper = {id:1,workSpace:'AAA',file:'./uploads/readme.txt',regArray:regArray};
 
     app.get('/rep', function(req, res){
-
-      var file = rapper.file 
-
-        rf.readFile(file,'utf-8',function(err,data){  
+        
+      var filer = JSON.parse(req.query.file);
+      var file= filer.path ;
+      console.log(filer);
+      var regArray = JSON.parse(req.query.regs);
+        fs.readFile(file,filer.encoding,function(err,data){  
         if(err){  
             console.log("error");  
         }else{  
+            var delimiter='\n';
+            switch(filer.encoding){
+                case 'utf8':
+                case 'utf-8':
+                    delimiter='\n';
+                    break;
+                case 'utf-8':
+                    delimiter='\r\n';
+                    break;
+            }
             var out = data;
-            var filea = data.split('\r\n');
-            var regExp1 = /.*\r\n/g;
-            var re1 = /[^ad]test./g;
-            var re2 = /[^bc]test./g;
-            
+            var filea = data.split(delimiter);
+            //var regExp1 = /.*\r\n/g;
+            var regExp1 = new RegExp('.*'+delimiter,'g')
             var x=0;
             var rowtbl=[];
             while((row=regExp1.exec(data)) !== null)
-            {   console.log(row);
+            {   //console.log(row);
                 rowtbl[x]=row.index;
                 x++;
             }
-            console.log(rowtbl);
 
-            var result;
-                for (j=0; j < regArray.length; ++j) {
-                    if (regArray[j].enable){
-                        var regExpScope = new RegExp('.*'+regArray[j].regScope,regArray[j].regScopeAttr);
-                        regExpScope.lastIndex=0;
-                        var regExpFind = new RegExp(regArray[j].regFind,regArray[j].regFindAttr);
-                        regExpFind.lastIndex=0;
-                        while ((result=regExpScope.exec(out)) !== null)  {
-                            var row=result.toString();
-                            var newrow = row.replace(regExpFind,regArray[j].regReplace);
-                            var f = rowtbl.findIndex(function findrow(element) {
-                                return element == result.index;
-                            });
-                            console.log(result.index);
-                            console.log(f);
-                            filea[f]= newrow;
+                var result;
+                //console.log('-->'+rowtbl); 
+                    for (j=0; j < regArray.length; ++j) {
+                        //console.log('-->'+regArray[j].enable); 
+                        if (regArray[j].enable){
+                            var regExpScope = new RegExp('.*'+regArray[j].regScope,regArray[j].regScopeAttr.value);
+                            regExpScope.lastIndex=0;
+                            while ((result=regExpScope.exec(out)) !== null)  {
+                                var row=result.toString();
+                                for (k=0; k < regArray[j].findArray.length; ++k) {
+                                    var regExpFind = new RegExp(regArray[j].findArray[k].regFind,regArray[j].findArray[k].regFindAttr.value);
+                                    regExpFind.lastIndex=0;
+                                    //console.log(regExpScope.exec(out));
+                                    //console.log('I:'+result.index+"|"+regExpFind + "F/R" +regArray[j].regReplace);
+                                    
+                                    row = row.replace(regExpFind,regArray[j].findArray[k].regReplace);
+                                    
+                                    //console.log('f-->'+filea[f]);
+                                }
+                                var f = rowtbl.findIndex(function (element) {
+                                        return element == result.index;
+                                    });
+                                filea[f]= row;
+                            }
+                            //console.log(filea);
                         }
                     }
-                }
-            console.log(filea.toString());  
-            var fileOut = './'+rapper.workSpace +"/readme.txt"; 
-            var arr=filea.join("\r\n");
-            rf.unlink(fileOut, function(err){
-            if(err){
-                throw err;
-            }
-                console.log('file:'+fileOut+' deleted');
-            
-                rf.appendFile(fileOut, arr, function(err){  
-                    if(err)  
-                        console.log("fail " + err);  
-                    else  
-                        console.log("write file ok");  
+                //console.log(filea);
+                console.log(filer.convPath);  
+                var fileOut = filer.convPath; //'./test/readme.txt'; 
+                var arr=filea.join(delimiter);
+                //console.log(arr)
+                fs.exists(fileOut,function(exists){  
+                    if(exists){  
+                        fs.unlink(fileOut, function(err){
+                            if(err){
+                                console.log(err);
+                                //throw err;
+                            }
+                                console.log('file:'+fileOut+' deleted');
+                                fs.appendFile(fileOut, arr, function(err){  
+                                    if(err)  
+                                        console.log("fail " + err);  
+                                    else  
+                                        console.log("write file ok");  
+                                });  
+                                filer.convFlag = true;
+                                res.send(filer);
+                            }); 
+                    }else{  
+                        fs.appendFile(fileOut, arr, function(err){  
+                                    if(err)  
+                                        console.log("fail " + err);  
+                                    else  
+                                        console.log("write file ok");  
+                                });  
+                                filer.convFlag = true;
+                                res.send(filer);
+                    }  
                 });  
-                res.send(arr);
-            })
-            
-        }  
-        
-        
+            }  
         });  
-
-      //res.download(path);
-        
     });
 
     // /files/* is accessed via req.params[0]
