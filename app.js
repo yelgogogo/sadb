@@ -3,6 +3,7 @@
     var bodyParser = require('body-parser');
     var multer = require('multer');
     var fs=require("fs");  
+    var fse = require('fs-extra')
     var zlib = require('zlib'); 
     var gzip = zlib.createGzip(); 
     var fstream = require('fstream');
@@ -86,11 +87,16 @@
                 wsDB.splice(f2, 1);
 
                 fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
-                    if(err)  
+                    if(err){  
                         console.log("fail " + err);  
-                    else  
+                    }else{ 
+                        fse.remove(delworkspace.path, function (err) {
+                            if (err) return console.error(err)
+                            console.log('success!')
+                        });
                         console.log("write file ok"); 
                         res.json(delworkspace);
+                    }
                 });  
             }
         });    
@@ -105,9 +111,14 @@
                 var i=1;
                 var wsDB = JSON.parse(data);
                 var postw = req.body;
-                postw.id=wsDB[wsDB.length-1].id+1;
-                wsDB.push( req.body);
-
+                if (wsDB.length === 0){
+                    postw.id=1;
+                }else{
+                    postw.id=wsDB[wsDB.length-1].id+1;
+                }
+                postw.path='works/'+postw.owner+'/'+postw.id;
+                wsDB.push( postw);
+                fse.ensureDirSync(postw.path);
                 fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
                     if(err)  
                         console.log("fail " + err);  
@@ -191,7 +202,11 @@
                 var i=1;
                 var wsDB = JSON.parse(data);
                 var postw = req.body;
-                postw.id=wsDB[wsDB.length-1].id+1;
+                if (wsDB.length === 0){
+                    postw.id=1;
+                }else{
+                    postw.id=wsDB[wsDB.length-1].id+1;
+                }
                 wsDB.push( req.body);
 
                 fs.writeFile(regsDB, JSON.stringify(wsDB), function(err){  
@@ -206,16 +221,20 @@
     });
 //--------------regs-end------------------------------
     app.get('/download', function(req, res){
-        var downzip = JSON.parse(req.query.workSpace);
-        var fileDownload = './'+downzip.name; 
+        var downzip = JSON.parse(req.query.workspace);
+        var fileDownload = downzip.path; 
+        var zippath=fileDownload+'-'+downzip.name+'.tar.gz';
         // var inp = fs.createReadStream(fileDownload); 
         // var out = fs.createWriteStream(workSpace.name+'.gz'); 
         // inp.pipe(gzip).pipe(out); 
         fstream.Reader({ 'path': fileDownload, 'type': 'Directory' }) /* Read the source directory */
         .pipe(tar.Pack()) /* Convert the directory to a .tar file */
         .pipe(zlib.Gzip()) /* Compress the .tar file */
-        .pipe(fstream.Writer({ 'path': rapper.workSpace+'.tar.gz' }));
-        res.download(rapper.workSpace+'.tar.gz'); // Set disposition and send it.
+        .pipe(fstream.Writer({ 'path': zippath }));
+        downzip.zippath=zippath;
+        res.download(zippath); // Set disposition and send it.
+        console.log(zippath+' downloaded!');
+        res.send(downzip);
     });
 
     app.get('/workspaces', function(req, res){
@@ -269,23 +288,25 @@
                     break;
             }
             var out = data;
-            var filea = data.split(delimiter);
+            var outf = data;
+            // var filea = data.split(delimiter);
             //var regExp1 = /.*\r\n/g;
-            var regExp1 = new RegExp('.*'+delimiter,'g')
-            var x=0;
-            var rowtbl=[];
-            while((row=regExp1.exec(data)) !== null)
-            {   //console.log(row);
-                rowtbl[x]=row.index;
-                x++;
-            }
-
-                var result;
-                //console.log('-->'+rowtbl); 
-                    for (j=0; j < regArray.length; ++j) {
-                        //console.log('-->'+regArray[j].enable); 
-                        if (regArray[j].enable){
-                            var regExpScope = new RegExp('.*'+regArray[j].regScope,regArray[j].regScopeAttr.value);
+            // var regExp1 = new RegExp('.*'+delimiter,'g');
+            // var x=0;
+            // var rowtbl=[];
+            // while((row=regExp1.exec(data)) !== null)
+            // {   //console.log(row);
+            //     rowtbl[x]=row.index;
+            //     x++;
+            // }
+            var result;
+            //console.log('-->'+rowtbl); 
+                for (j=0; j < regArray.length; ++j) {
+                    //console.log('-->'+regArray[j].enable); 
+                    if (regArray[j].enable){
+                        if (regArray[j].regScope,regArray[j].regScopeAttr.value !== 'cg'){
+                            var regExpScope = new RegExp(regArray[j].regScope,regArray[j].regScopeAttr.value);
+                            var regExpScopeR = new RegExp(regArray[j].regScope,'');
                             regExpScope.lastIndex=0;
                             while ((result=regExpScope.exec(out)) !== null)  {
                                 var row=result.toString();
@@ -294,23 +315,45 @@
                                     regExpFind.lastIndex=0;
                                     //console.log(regExpScope.exec(out));
                                     //console.log('I:'+result.index+"|"+regExpFind + "F/R" +regArray[j].regReplace);
-                                    
                                     row = row.replace(regExpFind,regArray[j].findArray[k].regReplace);
-                                    
                                     //console.log('f-->'+filea[f]);
                                 }
-                                var f = rowtbl.findIndex(function (element) {
-                                        return element == result.index;
-                                    });
-                                filea[f]= row;
+                                // var f = rowtbl.findIndex(function (element) {
+                                //         return element == result.index;
+                                //     });
+                                // filea[f]= row;
+                                // console.log(regExpScopeR);
+                                // console.log(row);
+                                // console.log(regExpScopeR.lastIndex);
+                                outf = outf.replace(regExpScopeR,row);
                             }
-                            //console.log(filea);
+                        }else{
+                            regArray[j].regScopeAttr.value=regArray[j].regScopeAttr.value.replace(/c/,'')
+                            var regExpScope = new RegExp(regArray[j].regScope,regArray[j].regScopeAttr.value);
+                            console.log(regExpScope);
+                            result=regExpScope.exec(out);
+                            for (k=0; k < regArray[j].findArray.length; ++k) {
+                                    var regExpFind = new RegExp(regArray[j].findArray[k].regFind,regArray[j].findArray[k].regFindAttr.value);
+                                    regExpFind.lastIndex=0;
+                                    //console.log(regExpScope.exec(out));
+                                    //console.log('I:'+result.index+"|"+regExpFind + "F/R" +regArray[j].regReplace);
+                                    
+                                    outf = outf.replace(regExpFind,regArray[j].findArray[k].regReplace);
+                                    
+                                    //console.log('f-->'+filea[f]);
+                            }
+                            //console.log(result.toString());
+                            if(result)
+                                console.log(result.toString());
                         }
+                        //console.log(filea);
                     }
+                }
                 //console.log(filea);
                 console.log(filer.convPath);  
                 var fileOut = filer.convPath; //'./test/readme.txt'; 
-                var arr=filea.join(delimiter);
+                //var arr=filea.join(delimiter);
+                var arr=outf;
                 //console.log(arr)
                 fs.exists(fileOut,function(exists){  
                     if(exists){  
@@ -349,7 +392,7 @@
     app.get('/:file(*)', function(req, res, next){
       var file = req.params.file;
       var path = __dirname + '/' + file;
-
+      console.log(path);
       res.download(path);
     });
 
