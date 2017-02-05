@@ -134,14 +134,19 @@
     // Add new Regarray
     var regsDB = 'db/regsdb.txt';
     app.get('/regs', function(req, res){
-        fs.readFile(regsDB,'utf-8',function(err,data){  
-            if(err){  
-                console.log(err);     
-                // throw err;
-            }else{ 
-                res.send(data);        
-            }
-        }); 
+        db.connect('db', ['regs']);
+        // console.log(postw);
+        
+        // console.log(db.regs.find());
+        res.json(db.regs.find()); 
+        // fs.readFile(regsDB,'utf-8',function(err,data){  
+        //     if(err){  
+        //         console.log(err);     
+        //         // throw err;
+        //     }else{ 
+        //         res.send(data);        
+        //     }
+        // }); 
     });
     // Update existing Regarray
     app.put('/regs/:wid', function(req, res) {
@@ -195,30 +200,37 @@
     });
 
     app.post('/regs', function(req, res) {
-        fs.readFile(regsDB,'utf-8',function(err,data){  
-            if(err){  
-                console.log("error");  
-            }else{ 
-                console.log(req.params); 
-                var i=1;
-                var wsDB = JSON.parse(data);
-                var postw = req.body;
-                if (wsDB.length === 0){
-                    postw.id=1;
-                }else{
-                    postw.id=wsDB[wsDB.length-1].id+1;
-                }
-                wsDB.push( req.body);
+        db.connect('db', ['regs']);
+        var postw = req.body;
+        postw.id = db.regs.count() + 1;
+        // console.log(postw);
+        db.regs.save(postw);
+        // console.log(db.regs.find());
+        res.json(postw); 
+        // fs.readFile(regsDB,'utf-8',function(err,data){  
+        //     if(err){  
+        //         console.log("error");  
+        //     }else{ 
+        //         console.log(req.params); 
+        //         var i=1;
+        //         var wsDB = JSON.parse(data);
+        //         var postw = req.body;
+        //         if (wsDB.length === 0){
+        //             postw.id=1;
+        //         }else{
+        //             postw.id=wsDB[wsDB.length-1].id+1;
+        //         }
+        //         wsDB.push( req.body);
 
-                fs.writeFile(regsDB, JSON.stringify(wsDB), function(err){  
-                    if(err)  
-                        console.log("fail " + err);  
-                    else  
-                        console.log("write file ok"); 
-                        res.json(wsDB);
-                });  
-            }
-        });    
+        //         fs.writeFile(regsDB, JSON.stringify(wsDB), function(err){  
+        //             if(err)  
+        //                 console.log("fail " + err);  
+        //             else  
+        //                 console.log("write file ok"); 
+        //                 res.json(wsDB);
+        //         });  
+        //     }
+        // });    
     });
 //--------------regs-end------------------------------
     app.get('/download', function(req, res){
@@ -253,16 +265,23 @@
         db.connect('db', ['users']);
         //console.log(db.users.find());
         res.send(db.users.find());
-        // fs.readFile(usersDB,'utf-8',function(err,data){  
-        //     if(err){  
-        //         console.log(err);     
-        //         // throw err;
-        //     }else{ 
-        //         res.send(data);  
-        //     }
-        // }); 
     });
 
+    app.get('/userbyname', function(req, res){
+        var indata = JSON.parse(req.query.user);
+        db.connect('db', ['users']);
+        console.log(db.users.findOne({name:indata.name,password:indata.password}));
+        res.send(db.users.findOne({name:indata.name,password:indata.password}));
+    });
+
+    app.post('/users', function(req, res) {
+        db.connect('db', ['users']);
+        var postw = req.body;
+        postw.id = db.users.count() + 1;
+        db.users.save(postw);
+        console.log(db.users.find());
+        res.json(postw);   
+    });
 
     // var regArray = [
     //         {id:1,enable:true,regScope : 'atest.',regScopeAttr : 'g',regFind : 'aaa',regFindAttr : 'i',regReplace : 'ReplaceA'},
@@ -431,17 +450,21 @@
                             console.log(err);
                             //throw err;
                         }else{
-                            console.log('file:'+path+' deleted'); 
+                            console.log('file:'+path+' deleted!'); 
                             filer.convFlag = false;
                             res.send(filer);
                         }
                     });
+                }else{
+                    console.log('file:'+path+' not exist!'); 
+                    filer.convFlag = false;
+                    res.send(filer);
                 }
             }); 
             break;
         }
-        filer.convFlag = false;
-        res.send(filer);
+        // filer.convFlag = false;
+        // res.send(filer);
     });
 
     app.listen('3100', function(){
