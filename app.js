@@ -135,10 +135,19 @@
     var regsDB = 'db/regsdb.txt';
     app.get('/regs', function(req, res){
         db.connect('db', ['regs']);
-        // console.log(postw);
+        var query = {visable:true};
+        // var query1 = {visable:true,owner:req.query.user};
+        // var query2 = {share:true};
+        // var owenerdata=db.regs.find(query1)
+        // console.log(db.regs.find());
+        // console.log(owenerdata);
+        //var backdata = db.regs.find()
+        var backdata = db.regs.find(query).filter(function(f){return f.owner ===req.query.user || f.share===true;});
+        // backdata=backdata.concat(owenerdata)
+        console.log(backdata);
         
         // console.log(db.regs.find());
-        res.json(db.regs.find()); 
+        res.json(backdata); 
         // fs.readFile(regsDB,'utf-8',function(err,data){  
         //     if(err){  
         //         console.log(err);     
@@ -150,53 +159,38 @@
     });
     // Update existing Regarray
     app.put('/regs/:wid', function(req, res) {
-        fs.readFile(regsDB,'utf-8',function(err,data){  
-            if(err){  
-                console.log("error");  
-            }else{ 
-
-                var wsDB = JSON.parse(data);
-                var f3 = wsDB.findIndex(function(element){return element.id == req.params.wid;});
-                if (f3 < 0){
-                    res.json(wsDB);
-                }else{
-                    wsDB[f3] = req.body;
-                    fs.writeFile(regsDB, JSON.stringify(wsDB), function(err){  
-                        if(err){  
-                            console.log("fail " + err);  
-                        }else{  
-                            console.log("write file ok"); 
-                            res.json(wsDB);
-                        }
-                    });  
-                }
-
-            }
-        });    
+        db.connect('db', ['regs']);
+        var postw = req.body;
+        var query = {id:req.params.wid};
+        db.regs.update(query,postw);
+        res.json(postw); 
     });
 
     app.delete('/regs/:did', function(req, res) {
-        fs.readFile(regsDB,'utf-8',function(err,data){  
-            if(err){  
-                console.log("error");  
-            }else{ 
-                console.log(req.params); 
-                var wsDB = JSON.parse(data);
-                var f2 = wsDB.findIndex(function(element){return element.id == req.params.did;});
-                var delworkspace = wsDB[f2]; 
-                console.log(f2+'|'+req.params.did);
-                console.log(wsDB);
-                wsDB.splice(f2, 1);
-                console.log(wsDB);
-                fs.writeFile(regsDB, JSON.stringify(wsDB), function(err){  
-                    if(err)  
-                        console.log("fail " + err);  
-                    else  
-                        console.log("write file ok"); 
-                        res.json(delworkspace);
-                });  
-            }
-        });    
+        db.connect('db', ['regs']);
+        var query = {id:Number(req.params.did)};
+        res.json(db.regs.update(query,{visable:false})); 
+        // fs.readFile(regsDB,'utf-8',function(err,data){  
+        //     if(err){  
+        //         console.log("error");  
+        //     }else{ 
+        //         console.log(req.params); 
+        //         var wsDB = JSON.parse(data);
+        //         var f2 = wsDB.findIndex(function(element){return element.id == req.params.did;});
+        //         var delworkspace = wsDB[f2]; 
+        //         console.log(f2+'|'+req.params.did);
+        //         console.log(wsDB);
+        //         wsDB.splice(f2, 1);
+        //         console.log(wsDB);
+        //         fs.writeFile(regsDB, JSON.stringify(wsDB), function(err){  
+        //             if(err)  
+        //                 console.log("fail " + err);  
+        //             else  
+        //                 console.log("write file ok"); 
+        //                 res.json(delworkspace);
+        //         });  
+        //     }
+        // });    
     });
 
     app.post('/regs', function(req, res) {
@@ -334,6 +328,7 @@
                             var regExpScope = new RegExp(regArray[j].regScope,regArray[j].regScopeAttr.value);
                             var regExpScopeR = new RegExp(regArray[j].regScope,'');
                             regExpScope.lastIndex=0;
+                            regExpScopeR.lastIndex=0;
                             while ((result=regExpScope.exec(out)) !== null)  {
                                 var row=result[0].toString();
                                 for (k=0; k < regArray[j].findArray.length; ++k) {
@@ -349,7 +344,7 @@
                                 //     });
                                 // filea[f]= row;
                                 // console.log(regExpScopeR);
-                                // console.log(row);
+                                //console.log(row);
                                 // console.log(regExpScopeR.lastIndex);
                                 outf = outf.replace(regExpScopeR,row);
                             }
