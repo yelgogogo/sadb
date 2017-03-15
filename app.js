@@ -55,8 +55,10 @@
     });
 
     app.get('/bay', function(req, res){
+      var indata = JSON.parse(req.query.user);
         db.connect('db', ['baydb']);
-        var getdata = db.baydb.find();
+        var query = {id:indata.bayid};
+        var getdata = db.baydb.findOne(query);
 
         res.json({data:getdata});       
     });
@@ -74,15 +76,16 @@
         console.log(req.body); 
         var postw = req.body; 
         postw.id = db.storydb.count() + 1;
-        // console.log(postw);
+        
         db.storydb.save(postw);
 
         db.connect('db', ['baydb']);
         var query = {id:postw.bayid};
         var findbay= db.baydb.findOne(query);
-        
+        console.log(postw);
+        console.log(findbay);
         findbay.storys.push(postw);
-        // console.log(findbay.storys);
+        
         db.baydb.update(query,{storys:findbay.storys});
         // console.log(db.baydb.find());
         res.json({data:postw});   
@@ -92,7 +95,32 @@
         var indata = JSON.parse(req.query.id);
         db.connect('db', ['storydb']);
         console.log(db.storydb.findOne({id:indata.id}));
-        res.send(db.storydb.findOne({id:indata.id}));
+        var rdata=db.storydb.findOne({id:indata.id});
+        res.send({data:rdata});
+    });
+
+
+    //add new story
+    app.post('/comment', function(req, res) {
+        var postw = req.body; 
+        db.connect('db', ['storydb']);
+        var query = {id:postw.storyid};
+        var findstory= db.storydb.findOne(query);
+        if(findstory.comments){
+            postw.id=findstory.comments.length + 1;
+        }else{
+            postw.id=1;
+            findstory.comments=[];
+        }
+        
+        findstory.comments.push(postw);
+        // console.log(findbay.storys);
+        db.storydb.update(query,{comments:findstory.comments});
+        // console.log(db.baydb.find());
+        db.connect('db', ['commentdb']);
+        db.commentdb.save(postw);
+
+        res.json({data:findstory});   
     });
 
     var workspacesDB = 'db/workspacesdb.txt';
@@ -102,55 +130,13 @@
         var query = {id:req.params.id};
         db.workspaces.update(query,putdata);
         res.json(putdata); 
-        // fs.readFile(workspacesDB,'utf-8',function(err,data){  
-        //     if(err){  
-        //         console.log("error");  
-        //     }else{ 
-        //         console.log(req.params); 
-        //         var wsDB = JSON.parse(data);
-        //         var f1 = wsDB.findIndex(function(element){return element.id == req.params.wid;});
-        //         wsDB[f1] = req.body;
-
-        //         fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
-        //             if(err){  
-        //                 console.log("fail " + err);  
-        //             }else{  
-        //                 console.log("write file ok"); 
-        //                 res.json(wsDB);}
-        //         });  
-        //     }
-        // });    
     });
 
     app.delete('/workspaces/:id', function(req, res) {
         db.connect('db', ['workspaces']);
         var query = {id:req.params.id};
         var deldata = db.workspaces.findOne(query);
-        db.workspaces.remove(query,false);
-        // fs.readFile(workspacesDB,'utf-8',function(err,data){  
-        //     if(err){  
-        //         console.log("error");  
-        //     }else{ 
-        //         console.log(req.params); 
-        //         var wsDB = JSON.parse(data);
-        //         var f2 = wsDB.findIndex(function(element){return element.id == req.params.id;});
-        //         var delworkspace = wsDB[f2]; 
-        //         wsDB.splice(f2, 1);
-
-        //         fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
-        //             if(err){  
-        //                 console.log("fail " + err);  
-        //             }else{ 
-        //                 fse.remove(delworkspace.path, function (err) {
-        //                     if (err) return console.error(err);
-        //                     console.log('success!');
-        //                 });
-        //                 console.log("write file ok"); 
-        //                 res.json(delworkspace);
-        //             }
-        //         });  
-        //     }
-        // });    
+        db.workspaces.remove(query,false); 
     });
 
     app.post('/workspaces', function(req, res) {
@@ -256,27 +242,28 @@
 
 
 
-    var usersDB = 'db/usersdb.txt';
     app.get('/users', function(req, res){
-        db.connect('db', ['users']);
+        db.connect('db', ['userdb']);
         //console.log(db.users.find());
-        res.send(db.users.find());
+        res.send(db.userdb.find());
     });
 
     app.get('/userbyname', function(req, res){
         var indata = JSON.parse(req.query.user);
-        db.connect('db', ['users']);
-        console.log(db.users.findOne({name:indata.name,password:indata.password}));
-        res.send(db.users.findOne({name:indata.name,password:indata.password}));
+        db.connect('db', ['userdb']);
+        console.log(db.userdb.findOne({name:indata.name,password:indata.password}));
+        var rdata=db.userdb.findOne({name:indata.name,password:indata.password});
+        delete rdata.password;
+        res.send({data:rdata});
     });  
 
     app.post('/users', function(req, res) {
-        db.connect('db', ['users']);
+        db.connect('db', ['userdb']);
         var postw = req.body;
-        postw.id = db.users.count() + 1;
-        db.users.save(postw);
-        console.log(db.users.find());
-        res.json(postw);   
+        postw.id = db.userdb.count() + 1;
+        db.userdb.save(postw);
+        console.log(db.userdb.find());
+        res.json({data:postw});   
     });
 
     // var regArray = [
