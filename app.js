@@ -57,7 +57,25 @@
     app.get('/bay', function(req, res){
       var indata = JSON.parse(req.query.user);
         db.connect('db', ['baydb']);
-        var query = {id:indata.bayid};
+        var query = {id:Number(indata.bayid)};
+        var getdata = db.baydb.findOne(query);
+
+        res.json({data:getdata});       
+    });
+
+    app.put('/bay/:id', function(req, res) {
+        db.connect('db', ['baydb']);
+        var putdata = req.body;
+        var query = {id:Number(req.params.id)};
+        db.baydb.update(query,putdata);
+        var getdata = db.baydb.findOne(query);
+        res.json({data:getdata}); 
+    });
+
+    app.get('/mybay', function(req, res){
+      var indata = JSON.parse(req.query.user);
+        db.connect('db', ['baydb']);
+        var query = {id:Number(indata.bayid),createrid:Number(indata.id)};
         var getdata = db.baydb.findOne(query);
 
         res.json({data:getdata});       
@@ -152,32 +170,7 @@
         db.workspaces.save(postdata);
         fse.ensureDirSync(postdata.path);
         //console.log(postdata);
-        res.json(db.workspaces.find()); 
-        // fs.readFile(workspacesDB,'utf-8',function(err,data){  
-        //     if(err){  
-        //         console.log("error");  
-        //     }else{ 
-        //         console.log(req.params); 
-        //         var i=1;
-        //         var wsDB = JSON.parse(data);
-        //         var postw = req.body;
-        //         if (wsDB.length === 0){
-        //             postw.id=1;
-        //         }else{
-        //             postw.id=wsDB[wsDB.length-1].id+1;
-        //         }
-        //         postw.path='works/'+postw.owner+'/'+postw.id;
-        //         wsDB.push( postw);
-        //         fse.ensureDirSync(postw.path);
-        //         fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
-        //             if(err) {
-        //                 console.log("fail " + err);  
-        //             }else{  
-        //                 console.log("write file ok"); 
-        //                 res.json(wsDB);}
-        //         });  
-        //     }
-        // });    
+        res.json(db.workspaces.find());   
     });
 //--------------regs-start------------------------------
     // Add new Regarray
@@ -185,26 +178,9 @@
     app.get('/regs', function(req, res){
         db.connect('db', ['regs']);
         var query = {visable:true};
-        // var query1 = {visable:true,owner:req.query.user};
-        // var query2 = {share:true};
-        // var owenerdata=db.regs.find(query1)
-        // console.log(db.regs.find());
-        // console.log(owenerdata);
-        //var backdata = db.regs.find()
         var backdata = db.regs.find(query).filter(function(f){return f.owner ===req.query.user || f.share===true;});
-        // backdata=backdata.concat(owenerdata)
         console.log(backdata);
-        
-        // console.log(db.regs.find());
         res.json(backdata); 
-        // fs.readFile(regsDB,'utf-8',function(err,data){  
-        //     if(err){  
-        //         console.log(err);     
-        //         // throw err;
-        //     }else{ 
-        //         res.send(data);        
-        //     }
-        // }); 
     });
     // Update existing Regarray
     app.put('/regs/:wid', function(req, res) {
@@ -246,6 +222,19 @@
         db.connect('db', ['userdb']);
         //console.log(db.users.find());
         res.send(db.userdb.find());
+    });
+
+    app.put('/users/:id', function(req, res) {
+        db.connect('db', ['userdb']);
+        var putdata = req.body;
+
+        var query = {id:Number(req.params.id)};
+        console.log(query);
+        console.log(db.userdb.find());
+        db.userdb.update(query,putdata);
+        var getdata = db.userdb.findOne(query);
+        console.log(getdata);
+        res.json({data:getdata}); 
     });
 
     app.get('/userbyname', function(req, res){
