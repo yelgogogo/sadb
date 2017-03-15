@@ -54,81 +54,144 @@
         });
     });
 
-    var workspacesDB = 'db/workspacesdb.txt';
-    app.put('/workspaces/:wid', function(req, res) {
-        fs.readFile(workspacesDB,'utf-8',function(err,data){  
-            if(err){  
-                console.log("error");  
-            }else{ 
-                console.log(req.params); 
-                var wsDB = JSON.parse(data);
-                var f1 = wsDB.findIndex(function(element){return element.id == req.params.wid;});
-                wsDB[f1] = req.body;
+    app.get('/bay', function(req, res){
+        db.connect('db', ['baydb']);
+        var getdata = db.baydb.find();
 
-                fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
-                    if(err){  
-                        console.log("fail " + err);  
-                    }else{  
-                        console.log("write file ok"); 
-                        res.json(wsDB);}
-                });  
-            }
-        });    
+        res.json({data:getdata});       
     });
 
-    app.delete('/workspaces/:did', function(req, res) {
-        fs.readFile(workspacesDB,'utf-8',function(err,data){  
-            if(err){  
-                console.log("error");  
-            }else{ 
-                console.log(req.params); 
-                var wsDB = JSON.parse(data);
-                var f2 = wsDB.findIndex(function(element){return element.id == req.params.did;});
-                var delworkspace = wsDB[f2]; 
-                wsDB.splice(f2, 1);
+    app.get('/story', function(req, res){
+        db.connect('db', ['storydb']);
+        var getdata = db.storydb.find();
 
-                fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
-                    if(err){  
-                        console.log("fail " + err);  
-                    }else{ 
-                        fse.remove(delworkspace.path, function (err) {
-                            if (err) return console.error(err);
-                            console.log('success!');
-                        });
-                        console.log("write file ok"); 
-                        res.json(delworkspace);
-                    }
-                });  
-            }
-        });    
+        res.json({data:getdata});       
+    });
+
+    //add new story
+    app.post('/story', function(req, res) {
+        db.connect('db', ['storydb']);
+        console.log(req.body); 
+        var postw = req.body; 
+        postw.id = db.storydb.count() + 1;
+        // console.log(postw);
+        db.storydb.save(postw);
+
+        db.connect('db', ['baydb']);
+        var query = {id:postw.bayid};
+        var findbay= db.baydb.findOne(query);
+        
+        findbay.storys.push(postw);
+        // console.log(findbay.storys);
+        db.baydb.update(query,{storys:findbay.storys});
+        // console.log(db.baydb.find());
+        res.json({data:postw});   
+    });
+
+    app.get('/storybyid', function(req, res){
+        var indata = JSON.parse(req.query.id);
+        db.connect('db', ['storydb']);
+        console.log(db.storydb.findOne({id:indata.id}));
+        res.send(db.storydb.findOne({id:indata.id}));
+    });
+
+    var workspacesDB = 'db/workspacesdb.txt';
+    app.put('/workspaces/:id', function(req, res) {
+        db.connect('db', ['workspaces']);
+        var putdata = req.body;
+        var query = {id:req.params.id};
+        db.workspaces.update(query,putdata);
+        res.json(putdata); 
+        // fs.readFile(workspacesDB,'utf-8',function(err,data){  
+        //     if(err){  
+        //         console.log("error");  
+        //     }else{ 
+        //         console.log(req.params); 
+        //         var wsDB = JSON.parse(data);
+        //         var f1 = wsDB.findIndex(function(element){return element.id == req.params.wid;});
+        //         wsDB[f1] = req.body;
+
+        //         fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
+        //             if(err){  
+        //                 console.log("fail " + err);  
+        //             }else{  
+        //                 console.log("write file ok"); 
+        //                 res.json(wsDB);}
+        //         });  
+        //     }
+        // });    
+    });
+
+    app.delete('/workspaces/:id', function(req, res) {
+        db.connect('db', ['workspaces']);
+        var query = {id:req.params.id};
+        var deldata = db.workspaces.findOne(query);
+        db.workspaces.remove(query,false);
+        // fs.readFile(workspacesDB,'utf-8',function(err,data){  
+        //     if(err){  
+        //         console.log("error");  
+        //     }else{ 
+        //         console.log(req.params); 
+        //         var wsDB = JSON.parse(data);
+        //         var f2 = wsDB.findIndex(function(element){return element.id == req.params.id;});
+        //         var delworkspace = wsDB[f2]; 
+        //         wsDB.splice(f2, 1);
+
+        //         fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
+        //             if(err){  
+        //                 console.log("fail " + err);  
+        //             }else{ 
+        //                 fse.remove(delworkspace.path, function (err) {
+        //                     if (err) return console.error(err);
+        //                     console.log('success!');
+        //                 });
+        //                 console.log("write file ok"); 
+        //                 res.json(delworkspace);
+        //             }
+        //         });  
+        //     }
+        // });    
     });
 
     app.post('/workspaces', function(req, res) {
-        fs.readFile(workspacesDB,'utf-8',function(err,data){  
-            if(err){  
-                console.log("error");  
-            }else{ 
-                console.log(req.params); 
-                var i=1;
-                var wsDB = JSON.parse(data);
-                var postw = req.body;
-                if (wsDB.length === 0){
-                    postw.id=1;
-                }else{
-                    postw.id=wsDB[wsDB.length-1].id+1;
-                }
-                postw.path='works/'+postw.owner+'/'+postw.id;
-                wsDB.push( postw);
-                fse.ensureDirSync(postw.path);
-                fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
-                    if(err) {
-                        console.log("fail " + err);  
-                    }else{  
-                        console.log("write file ok"); 
-                        res.json(wsDB);}
-                });  
-            }
-        });    
+        db.connect('db', ['workspaces']);
+        var postdata = req.body;
+        wsDB=db.workspaces.find();
+        if (wsDB.length === 0){
+            postdata.id=1;
+        }else{
+            postdata.id=wsDB[wsDB.length-1].id+1;
+        }
+        postdata.path='works/'+postdata.owner+'/'+postdata.id;
+        db.workspaces.save(postdata);
+        fse.ensureDirSync(postdata.path);
+        //console.log(postdata);
+        res.json(db.workspaces.find()); 
+        // fs.readFile(workspacesDB,'utf-8',function(err,data){  
+        //     if(err){  
+        //         console.log("error");  
+        //     }else{ 
+        //         console.log(req.params); 
+        //         var i=1;
+        //         var wsDB = JSON.parse(data);
+        //         var postw = req.body;
+        //         if (wsDB.length === 0){
+        //             postw.id=1;
+        //         }else{
+        //             postw.id=wsDB[wsDB.length-1].id+1;
+        //         }
+        //         postw.path='works/'+postw.owner+'/'+postw.id;
+        //         wsDB.push( postw);
+        //         fse.ensureDirSync(postw.path);
+        //         fs.writeFile(workspacesDB, JSON.stringify(wsDB), function(err){  
+        //             if(err) {
+        //                 console.log("fail " + err);  
+        //             }else{  
+        //                 console.log("write file ok"); 
+        //                 res.json(wsDB);}
+        //         });  
+        //     }
+        // });    
     });
 //--------------regs-start------------------------------
     // Add new Regarray
@@ -169,63 +232,10 @@
     app.delete('/regs/:did', function(req, res) {
         db.connect('db', ['regs']);
         var query = {id:Number(req.params.did)};
-        res.json(db.regs.update(query,{visable:false})); 
-        // fs.readFile(regsDB,'utf-8',function(err,data){  
-        //     if(err){  
-        //         console.log("error");  
-        //     }else{ 
-        //         console.log(req.params); 
-        //         var wsDB = JSON.parse(data);
-        //         var f2 = wsDB.findIndex(function(element){return element.id == req.params.did;});
-        //         var delworkspace = wsDB[f2]; 
-        //         console.log(f2+'|'+req.params.did);
-        //         console.log(wsDB);
-        //         wsDB.splice(f2, 1);
-        //         console.log(wsDB);
-        //         fs.writeFile(regsDB, JSON.stringify(wsDB), function(err){  
-        //             if(err)  
-        //                 console.log("fail " + err);  
-        //             else  
-        //                 console.log("write file ok"); 
-        //                 res.json(delworkspace);
-        //         });  
-        //     }
-        // });    
+        res.json(db.regs.update(query,{visable:false}));   
     });
 
-    app.post('/regs', function(req, res) {
-        db.connect('db', ['regs']);
-        var postw = req.body;
-        postw.id = db.regs.count() + 1;
-        // console.log(postw);
-        db.regs.save(postw);
-        // console.log(db.regs.find());
-        res.json(postw); 
-        // fs.readFile(regsDB,'utf-8',function(err,data){  
-        //     if(err){  
-        //         console.log("error");  
-        //     }else{ 
-        //         console.log(req.params); 
-        //         var i=1;
-        //         var wsDB = JSON.parse(data);
-        //         var postw = req.body;
-        //         if (wsDB.length === 0){
-        //             postw.id=1;
-        //         }else{
-        //             postw.id=wsDB[wsDB.length-1].id+1;
-        //         }
-        //         wsDB.push( req.body);
 
-        //         fs.writeFile(regsDB, JSON.stringify(wsDB), function(err){  
-        //             if(err)  
-        //                 console.log("fail " + err);  
-        //             else  
-        //                 console.log("write file ok"); 
-        //                 res.json(wsDB);
-        //         });  
-        //     }
-        // });    
-    });
 //--------------regs-end------------------------------
     app.get('/download', function(req, res){
         var downzip = JSON.parse(req.query.workspace);
@@ -244,15 +254,7 @@
         res.send(downzip);
     });
 
-    app.get('/workspaces', function(req, res){
-        fs.readFile(workspacesDB,'utf-8',function(err,data){  
-            if(err){  
-                console.log( err); 
-            }else{ 
-                res.send(data);        
-            }
-        });       
-    });
+
 
     var usersDB = 'db/usersdb.txt';
     app.get('/users', function(req, res){
@@ -266,7 +268,7 @@
         db.connect('db', ['users']);
         console.log(db.users.findOne({name:indata.name,password:indata.password}));
         res.send(db.users.findOne({name:indata.name,password:indata.password}));
-    });
+    });  
 
     app.post('/users', function(req, res) {
         db.connect('db', ['users']);
