@@ -56,10 +56,22 @@
 
     app.get('/bay', function(req, res){
       var indata = JSON.parse(req.query.user);
-        db.connect('db', ['baydb']);
-        var query = {id:Number(indata.bayid)};
-        var getdata = db.baydb.findOne(query);
+      db.connect('db', ['storydb']);
+      var query = {bayid:Number(indata.bayid)};
+      var storyarr = db.storydb.find(query);
 
+        db.connect('db', ['baydb']);
+        query = {id:Number(indata.bayid)};
+        var getdata = db.baydb.findOne(query);
+        
+        getdata.storys.forEach(function(baysty,index){
+          getdata.storys[index]=storyarr.find(function(fsty){return fsty.id===baysty.id;});	
+        });
+        console.log(getdata.storys);
+        getdata.storys=getdata.storys.filter(function(f){
+          return f.delflag!==true;
+        });
+        // console.log(getdata.storys);
         res.json({data:getdata});       
     });
 
@@ -75,9 +87,10 @@
     app.get('/mybay', function(req, res){
       var indata = JSON.parse(req.query.user);
         db.connect('db', ['baydb']);
-        var query = {id:Number(indata.bayid),createrid:Number(indata.id)};
+        console.log(indata);
+        var query = {id:Number(indata.bayid)};
         var getdata = db.baydb.findOne(query);
-
+        delete getdata.storys;
         res.json({data:getdata});       
     });
 
@@ -94,14 +107,16 @@
         console.log(req.body); 
         var postw = req.body; 
         postw.id = db.storydb.count() + 1;
-        
+        // postw.description=postw.description.replace(/\n/g,'\r\n');
         db.storydb.save(postw);
 
         db.connect('db', ['baydb']);
-        var query = {id:postw.bayid};
+        var query = {id:Number(postw.bayid),delflag:false};
         var findbay= db.baydb.findOne(query);
-        console.log(postw);
-        console.log(findbay);
+        // console.log(postw);
+        // console.log(findbay);
+        // console.log(query);
+        // console.log(db.baydb.findOne());
         findbay.storys.push(postw);
         
         db.baydb.update(query,{storys:findbay.storys});
@@ -112,11 +127,47 @@
     app.get('/storybyid', function(req, res){
         var indata = JSON.parse(req.query.id);
         db.connect('db', ['storydb']);
-        console.log(db.storydb.findOne({id:indata.id}));
-        var rdata=db.storydb.findOne({id:indata.id});
+        console.log(db.storydb.findOne({id:indata.id,delflag:false}));
+        var rdata=db.storydb.findOne({id:indata.id,delflag:false});
         res.send({data:rdata});
     });
 
+    //soft delte story
+    app.delete('/story/:id', function(req, res) {
+      var indata = JSON.parse(req.query.parm).user;
+      db.connect('db', ['storydb']);
+
+      var query = {id:Number(req.params.id)};
+      var deldata = db.storydb.findOne(query);
+      console.log(query);
+      console.log(deldata);
+      options = {
+        multi: false, // update multiple - default false 
+        upsert: true // if object is not found, add it (update-insert) - default false 
+	  };
+	  // console.log(indata,deldata.ownerid);
+	  if (deldata){
+	  	if (Number(indata.id)===deldata.ownerid){
+      	  db.storydb.update(query,{delflag:true},options); 
+      	  console.log(db.storydb.findOne(query));
+      	}
+	  }
+      
+      deldata = db.storydb.findOne(query);
+      // db.connect('db', ['baydb']);
+      // var query = {id:Number(deldata.bayid)};
+      // var findbay= db.baydb.findOne(query);
+      // var i=findbay.storys.findIndex(
+      // 	function(x) { return x.id === deldata.id; }
+      // 	);
+      // console.log(i);
+      // findbay.storys[i]=deldata;
+      // db.baydb.update(query,{storys:findbay.storys});
+      // console.log(db.baydb.findOne(query).storys[i]);
+      res.json({data:deldata}); 
+      
+
+    });
 
     //add new story
     app.post('/comment', function(req, res) {
@@ -150,12 +201,7 @@
         res.json(putdata); 
     });
 
-    app.delete('/workspaces/:id', function(req, res) {
-        db.connect('db', ['workspaces']);
-        var query = {id:req.params.id};
-        var deldata = db.workspaces.findOne(query);
-        db.workspaces.remove(query,false); 
-    });
+    
 
     app.post('/workspaces', function(req, res) {
         db.connect('db', ['workspaces']);
@@ -251,143 +297,32 @@
         var postw = req.body;
         postw.id = db.userdb.count() + 1;
         db.userdb.save(postw);
-        console.log(db.userdb.find());
+        db.connect('db', ['baydb']);
+        var query = {id:Number(postw.bayid)};
+        var fdata=db.baydb.findOne(query);
+        fdata.people.push(postw);
+        db.baydb.update(query,{people:fdata.people});
+        // console.log(db.baydb.find());
         res.json({data:postw});   
     });
 
-    // var regArray = [
-    //         {id:1,enable:true,regScope : 'atest.',regScopeAttr : 'g',regFind : 'aaa',regFindAttr : 'i',regReplace : 'ReplaceA'},
-    //         {id:2,enable:true,regScope : 'btest..',regScopeAttr : 'g',regFind : 'bbb',regFindAttr : 'i',regReplace : 'ReplaceBB'},
-    //         {id:3,enable:true,regScope : 'ctest...',regScopeAttr : 'g',regFind : 'ccc',regFindAttr : 'i',regReplace : 'ReplaceCCC'}
-    //         ];
-    // var rapper = {id:1,workSpace:'AAA',file:'./uploads/readme.txt',regArray:regArray};
+    app.get('/repairstory/:id', function(req, res){
+      var indata = JSON.parse(req.params.id);
+      db.connect('db', ['userdb']);
+      var alluser=db.userdb.find();
 
-    app.get('/rep', function(req, res){
+        db.connect('db', ['storydb']);
+        var rstory=db.storydb.findOne({id:Number(indata.id)});
+        if (rstory.owner){
+	      var fusr=alluser.find(function(usr){
+      	  	return usr.name===rstory.owner;
+	      });
+	      rstory.ownerid=fusr.id;
+    	}else{
+    	  rstory.ownerid=1;	
+    	}
         
-      var filer = JSON.parse(req.query.file);
-      var file= filer.path ;
-      console.log(filer);
-      var regArray = JSON.parse(req.query.regs);
-        fs.readFile(file,'binary',function(err,data){  
-        if(err){  
-            console.log("error");  
-        }else{  
-            // var delimiter='\n';
-            // switch(filer.encoding){
-            //     case 'utf8':
-            //     case 'utf-8':
-            //         delimiter='\n';
-            //         break;
-            //     case 'utf-8':
-            //         delimiter='\r\n';
-            //         break;
-            // }
-            var out = data;
-            var outf = data;
-            // var outff = iconv.decode(data, 'ascii');
-            // console.log('1--'+out);
-            // console.log('2--'+outff);
-            // var filea = data.split(delimiter);
-            //var regExp1 = /.*\r\n/g;
-            // var regExp1 = new RegExp('.*'+delimiter,'g');
-            // var x=0;
-            // var rowtbl=[];
-            // while((row=regExp1.exec(data)) !== null)
-            // {   //console.log(row);
-            //     rowtbl[x]=row.index;
-            //     x++;
-            // }
-            var result;
-            //console.log('-->'+rowtbl); 
-                for (j=0; j < regArray.length; ++j) {
-                    //console.log('-->'+regArray[j].enable); 
-                    if (regArray[j].enable){
-                        // if (regArray[j].regScope,regArray[j].regScopeAttr.value !== 'cg'){
-                            var regExpScope = new RegExp(regArray[j].regScope,regArray[j].regScopeAttr.value);
-                            var regExpScopeR = new RegExp(regArray[j].regScope,'');
-                            regExpScope.lastIndex=0;
-                            regExpScopeR.lastIndex=0;
-                            while ((result=regExpScope.exec(out)) !== null)  {
-                                var row=result[0].toString();
-                                for (k=0; k < regArray[j].findArray.length; ++k) {
-                                    var regExpFind = new RegExp(regArray[j].findArray[k].regFind,regArray[j].findArray[k].regFindAttr.value);
-                                    regExpFind.lastIndex=0;
-                                    //console.log(regExpScope.exec(out));
-                                    //console.log('I:'+result.index+"|"+regExpFind + "F/R" +regArray[j].regReplace);
-                                    row = row.replace(regExpFind,regArray[j].findArray[k].regReplace);
-                                    //console.log('f-->'+filea[f]);
-                                }
-                                // var f = rowtbl.findIndex(function (element) {
-                                //         return element == result.index;
-                                //     });
-                                // filea[f]= row;
-                                // console.log(regExpScopeR);
-                                //console.log(row);
-                                // console.log(regExpScopeR.lastIndex);
-                                outf = outf.replace(regExpScopeR,row);
-                            }
-                        //}
-                        // else{
-                        //     // regArray[j].regScopeAttr.value=regArray[j].regScopeAttr.value.replace(/c/,'')
-                        //     var regExpScope = new RegExp(regArray[j].regScope,regArray[j].regScopeAttr.value);
-                        //     console.log(regExpScope);
-                        //     result=regExpScope.exec(out);
-                        //     for (k=0; k < regArray[j].findArray.length; ++k) {
-                        //             var regExpFind = new RegExp(regArray[j].findArray[k].regFind,regArray[j].findArray[k].regFindAttr.value);
-                        //             regExpFind.lastIndex=0;
-                        //             //console.log(regExpScope.exec(out));
-                        //             //console.log('I:'+result.index+"|"+regExpFind + "F/R" +regArray[j].regReplace);
-                                    
-                        //             outf = outf.replace(regExpFind,regArray[j].findArray[k].regReplace);
-                                    
-                        //             //console.log('f-->'+filea[f]);
-                        //     }
-                        //     //console.log(result.toString());
-                        //     if(result)
-                        //         console.log(result.toString());
-                        // }
-                        //console.log(filea);
-                    }
-                }
-                //console.log(filea);
-                console.log(filer.convPath);  
-                var fileOut = filer.convPath; //'./test/readme.txt'; 
-                //var arr=filea.join(delimiter);
-                var arr=outf;
-                var opt={encoding: 'binary'};
-                //console.log(arr)
-                fs.exists(fileOut,function(exists){  
-                    if(exists){  
-                        fs.unlink(fileOut, function(err){
-                            if(err){
-                                console.log(err);
-                                //throw err;
-                            }
-                                console.log('file:'+fileOut+' deleted');
-
-                                fs.appendFile(fileOut, arr,opt, function(err){  
-                                    if(err) { 
-                                        console.log("fail " + err);  
-                                    }else{  
-                                        console.log("write file ok");
-                                        filer.convFlag = true;
-                                        res.send(filer);}  
-                                });  
-                                
-                            }); 
-                    }else{  
-                        fs.appendFile(fileOut, arr,opt, function(err){  
-                                    if(err) { 
-                                        console.log("fail " + err);  
-                                    }else{  
-                                        console.log("write file ok");
-                                        filer.convFlag = true;
-                                        res.send(filer);}  
-                                }); 
-                    }  
-                });  
-            }  
-        });  
+        res.send({data:rstory});
     });
 
     // /files/* is accessed via req.params[0]
