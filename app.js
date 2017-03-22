@@ -16,6 +16,7 @@
     app.use(function(req, res, next) { //allow cross origin requests
         res.setHeader("Access-Control-Allow-Methods", "POST, PUT, OPTIONS, DELETE, GET");
         res.header("Access-Control-Allow-Origin", "http://localhost:4200");
+        // res.header("Access-Control-Allow-Origin", "http://starstech.iego.cn");
         res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
         res.header("Access-Control-Allow-Credentials", true);
         next();
@@ -25,6 +26,13 @@
     No cors required */
     app.use(express.static('../client'));
     app.use(bodyParser.json());  
+
+    function del_id(obj){
+        if( obj._id){
+            delete obj._id;
+        }
+        return obj;
+    }
 
     var storage = multer.diskStorage({ //multers disk storage settings
         destination: function (req, file, cb) {
@@ -62,17 +70,25 @@
 
         db.connect('db', ['baydb']);
         query = {id:Number(indata.bayid)};
-        var getdata = db.baydb.findOne(query);
-        
-        getdata.storys.forEach(function(baysty,index){
-          getdata.storys[index]=storyarr.find(function(fsty){return fsty.id===baysty.id;});	
-        });
-        console.log(getdata.storys);
-        getdata.storys=getdata.storys.filter(function(f){
-          return f.delflag!==true;
-        });
+        var getdata = db.baydb.findOne(query); 
+        //console.log(getdata.storys);
+        if (getdata){
+            if(!getdata.storys){getdata.storys=[]};
+        	getdata.storys.forEach(function(baysty,index){
+	          getdata.storys[index]=storyarr.find(function(fsty){return fsty.id===baysty.id;});	
+              //console.log(getdata.storys[index],index);
+	        });
+	        console.log(getdata.storys);
+	        getdata.storys=getdata.storys.filter(function(f){
+              //console.log(f);
+	          return f.delflag!==true; 
+	        });
+        }
+        	
         // console.log(getdata.storys);
-        res.json({data:getdata});       
+  
+        res.json({data:del_id(getdata)});       
+        
     });
 
     app.put('/bay/:id', function(req, res) {
@@ -81,35 +97,61 @@
         var query = {id:Number(req.params.id)};
         db.baydb.update(query,putdata);
         var getdata = db.baydb.findOne(query);
-        res.json({data:getdata}); 
+
+        res.json({data:del_id(getdata)}); 
+    });
+
+    //add new bay
+    app.post('/bay', function(req, res) {
+        db.connect('db', ['baydb']);
+        //console.log(req.body); 
+        var postw = req.body;
+        var checkbay = db.baydb.findOne({createrid:Number(postw.createrid)});
+        if (checkbay){
+          postw.on_err=true;
+          postw.err_msg='你只能拥有一个港口';     
+        }else{
+          postw.id = db.baydb.count() + 1;
+          db.baydb.save(postw);  
+          postw=db.baydb.findOne({id:Number(postw.id)});
+          console.log(postw);
+          del_id(postw);
+          console.log(postw);  
+        }
+
+        res.json({data:del_id(postw)});   
     });
 
     app.get('/mybay', function(req, res){
       var indata = JSON.parse(req.query.user);
         db.connect('db', ['baydb']);
-        console.log(indata);
+        //console.log(indata);
         var query = {id:Number(indata.bayid)};
         var getdata = db.baydb.findOne(query);
-        delete getdata.storys;
-        res.json({data:getdata});       
+        if(getdata){
+        	delete getdata.storys;
+        }
+        
+        res.json({data:del_id(getdata)});       
     });
 
     app.get('/story', function(req, res){
         db.connect('db', ['storydb']);
         var getdata = db.storydb.find();
 
-        res.json({data:getdata});       
+        res.json({data:del_id(getdata)});       
     });
 
     //add new story
     app.post('/story', function(req, res) {
         db.connect('db', ['storydb']);
-        console.log(req.body); 
+        //console.log(req.body); 
         var postw = req.body; 
         postw.id = db.storydb.count() + 1;
         // postw.description=postw.description.replace(/\n/g,'\r\n');
         db.storydb.save(postw);
-
+        var querystory={id:postw.id}
+        var newstory=db.storydb.findOne(querystory);
         db.connect('db', ['baydb']);
         var query = {id:Number(postw.bayid),delflag:false};
         var findbay= db.baydb.findOne(query);
@@ -117,19 +159,41 @@
         // console.log(findbay);
         // console.log(query);
         // console.log(db.baydb.findOne());
-        findbay.storys.push(postw);
+        if(!findbay.storys){findbay.storys=[]};
+        findbay.storys.push({id:Number(postw.id),_id:newstory._id});
         
         db.baydb.update(query,{storys:findbay.storys});
         // console.log(db.baydb.find());
-        res.json({data:postw});   
+        res.json({data:del_id(postw)});   
     });
 
     app.get('/storybyid', function(req, res){
         var indata = JSON.parse(req.query.id);
+
+        db.connect('db', ['commentdb']);
+        var querycomment = {storyid:Number(indata.id)};
+        commentarr=db.commentdb.find(querycomment);
+
         db.connect('db', ['storydb']);
-        console.log(db.storydb.findOne({id:indata.id,delflag:false}));
-        var rdata=db.storydb.findOne({id:indata.id,delflag:false});
-        res.send({data:rdata});
+        // console.log(db.storydb.findOne({id:indata.id,delflag:false}));
+        // var rdata=db.storydb.findOne();
+        var querystory={id:indata.id,delflag:false};
+
+        var getdata = db.storydb.findOne(querystory); 
+        // console.log(getdata.comments);
+        if (getdata){
+            getdata.comments.forEach(function(baysty,index){
+              getdata.comments[index]=commentarr.find(function(fsty){return fsty.id===baysty.id;}); 
+              // console.log(getdata.comments[index],index);
+            });
+            //console.log(getdata.storys);
+            getdata.comments=getdata.comments.filter(function(f){
+              // console.log(f);
+              return f.delflag!==true; 
+            });
+        }
+
+        res.send({data:del_id(getdata)});
     });
 
     //soft delte story
@@ -164,7 +228,7 @@
       // findbay.storys[i]=deldata;
       // db.baydb.update(query,{storys:findbay.storys});
       // console.log(db.baydb.findOne(query).storys[i]);
-      res.json({data:deldata}); 
+      res.json({data:del_id(deldata)}); 
       
 
     });
@@ -172,6 +236,8 @@
     //add new story
     app.post('/comment', function(req, res) {
         var postw = req.body; 
+
+        
         db.connect('db', ['storydb']);
         var query = {id:postw.storyid};
         var findstory= db.storydb.findOne(query);
@@ -182,14 +248,19 @@
             findstory.comments=[];
         }
         
-        findstory.comments.push(postw);
-        // console.log(findbay.storys);
-        db.storydb.update(query,{comments:findstory.comments});
-        // console.log(db.baydb.find());
         db.connect('db', ['commentdb']);
         db.commentdb.save(postw);
+        var querycomment={id:postw.id,storyid:postw.storyid}
+        postw=db.commentdb.findOne(querycomment);
 
-        res.json({data:findstory});   
+        findstory.comments.push(postw);
+        // console.log(findbay.storys);
+        db.connect('db', ['storydb']);
+        db.storydb.update(query,{comments:findstory.comments});
+        // console.log(db.baydb.find());
+        
+
+        res.json({data:del_id(findstory)});   
     });
 
     var workspacesDB = 'db/workspacesdb.txt';
@@ -273,37 +344,88 @@
     app.put('/users/:id', function(req, res) {
         db.connect('db', ['userdb']);
         var putdata = req.body;
+        putdata.on_err=false;
+        putdata.err_msg={};
+        var queryuser = {id:Number(req.params.id)};
+        // console.log(query);
+        
+        db.connect('db', ['baydb']);
+        var querybay = {invitekey:putdata.invitekey};
+        console.log(querybay);
+         console.log(db.baydb.findOne(querybay));
+        var fdata=db.baydb.findOne(querybay);
+        if (fdata){
+          putdata.bayid=fdata.id;
+          if (!fdata.people){fdata.people=[]};
+          fdata.people.push(queryuser);
+          db.baydb.update(querybay,{people:fdata.people});
+          db.connect('db', ['userdb']);
+          // console.log(putdata);
+          db.userdb.update(queryuser,
+            {bayid:fdata.id},
+            {avatar:putdata.avatar},
+            {updatetime:putdata.updatetime}
+          );
+        }else{
+          putdata.on_err=true;
+          putdata.err_msg.invitekey_err='邀请码无效';
+        }
 
-        var query = {id:Number(req.params.id)};
-        console.log(query);
-        console.log(db.userdb.find());
-        db.userdb.update(query,putdata);
-        var getdata = db.userdb.findOne(query);
-        console.log(getdata);
-        res.json({data:getdata}); 
+        
+        // var getdata = db.userdb.findOne(queryuser);
+        // getdata.on_err=putdata.on_err;
+        // getdata.err_msg=putdata.err_msg;
+        // console.log(getdata);
+        res.json({data:del_id(putdata)}); 
     });
 
     app.get('/userbyname', function(req, res){
         var indata = JSON.parse(req.query.user);
         db.connect('db', ['userdb']);
-        console.log(db.userdb.findOne({name:indata.name,password:indata.password}));
+        //console.log(db.userdb.findOne({name:indata.name,password:indata.password}));
         var rdata=db.userdb.findOne({name:indata.name,password:indata.password});
         delete rdata.password;
-        res.send({data:rdata});
+        res.send({data:del_id(rdata)});
     });  
 
     app.post('/users', function(req, res) {
         db.connect('db', ['userdb']);
+
         var postw = req.body;
-        postw.id = db.userdb.count() + 1;
-        db.userdb.save(postw);
-        db.connect('db', ['baydb']);
-        var query = {id:Number(postw.bayid)};
-        var fdata=db.baydb.findOne(query);
-        fdata.people.push(postw);
-        db.baydb.update(query,{people:fdata.people});
+        postw.on_err=false;
+        postw.err_msg={};
+        if(db.userdb.findOne({name:postw.name})){
+          postw.on_err=true;
+          postw.err_msg.name_err='用户已存在';
+        }else if(db.userdb.findOne({nickname:postw.nickname})){
+          postw.on_err=true;
+          postw.err_msg.nickname_err='昵称已存在';
+        }else{
+          postw.id = db.userdb.count() + 1;
+        
+          db.connect('db', ['baydb']);
+          var query = {invitekey:postw.invitekey};
+          var fdata=db.baydb.findOne(query);
+          if (fdata){
+            
+            postw.bayid=Number(fdata.id);
+            db.connect('db', ['userdb']);
+
+            db.userdb.save(postw);
+            var newuser =db.userdb.findOne({name:postw.name},{nickname:postw.nickname});
+            console.log(newuser);
+
+            postw._id=newuser._id;
+            fdata.people.push({id:postw.id,_id:postw._id});
+            db.connect('db', ['baydb']);
+            db.baydb.update(query,{people:fdata.people});
+          }else{
+            postw.on_err=true;
+            postw.err_msg.invitekey_err='邀请码无效';
+          }
+        }
         // console.log(db.baydb.find());
-        res.json({data:postw});   
+        res.json({data:del_id(postw)});   
     });
 
     app.get('/repairstory/:id', function(req, res){
@@ -322,7 +444,7 @@
     	  rstory.ownerid=1;	
     	}
         
-        res.send({data:rstory});
+        res.send({data:del_id(rstory)});
     });
 
     // /files/* is accessed via req.params[0]
@@ -343,7 +465,7 @@
 
     app.delete('/delconvf', function(req, res){
         var filer = JSON.parse(req.query.file);
-        console.log(filer);
+        //console.log(filer);
         var file = filer.convPath;
         var path = __dirname + '/' + file;
         var folder1 = file.match(/[^\\\/]+/);
