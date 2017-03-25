@@ -9,14 +9,20 @@
     var fstream = require('fstream');
     var tar = require('tar');
     var db = require('diskdb');
+    var userdb = require('diskdb');
+    var https = require('https');
+    var privateKey  = fs.readFileSync('/etc/nginx/cert/214053462170887.key', 'utf8');
+    var certificate = fs.readFileSync('/etc/nginx/cert/214053462170887.pem', 'utf8');
+    var credentials = {key: privateKey, cert: certificate};
+    var httpsServer = https.createServer(credentials, app);
     // var iconv = require('iconv-lite');
 
 
 
     app.use(function(req, res, next) { //allow cross origin requests
         res.setHeader("Access-Control-Allow-Methods", "POST, PUT, OPTIONS, DELETE, GET");
-        res.header("Access-Control-Allow-Origin", "http://localhost:4200");
-        // res.header("Access-Control-Allow-Origin", "http://starstech.iego.cn");
+        //res.header("Access-Control-Allow-Origin", "http://localhost:4200");
+         res.header("Access-Control-Allow-Origin", "https://www.starstech.tech");
         res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
         res.header("Access-Control-Allow-Credentials", true);
         next();
@@ -28,7 +34,7 @@
     app.use(bodyParser.json());  
 
     function del_id(obj){
-        if( obj._id){
+        if( obj && obj._id){
             delete obj._id;
         }
         return obj;
@@ -78,7 +84,7 @@
 	          getdata.storys[index]=storyarr.find(function(fsty){return fsty.id===baysty.id;});	
               //console.log(getdata.storys[index],index);
 	        });
-	        console.log(getdata.storys);
+	        //console.log(getdata.storys);
 	        getdata.storys=getdata.storys.filter(function(f){
               //console.log(f);
 	          return f.delflag!==true; 
@@ -125,12 +131,19 @@
     app.get('/mybay', function(req, res){
       var indata = JSON.parse(req.query.user);
         db.connect('db', ['baydb']);
+        // console.log(indata);
+        var query = {createrid:Number(indata.id)};
+        var getdata = db.baydb.findOne(query);
+        
+        res.json({data:del_id(getdata)});       
+    });
+
+    app.get('/joinbay', function(req, res){
+      var indata = JSON.parse(req.query.user);
+        db.connect('db', ['baydb']);
         //console.log(indata);
         var query = {id:Number(indata.bayid)};
         var getdata = db.baydb.findOne(query);
-        if(getdata){
-        	delete getdata.storys;
-        }
         
         res.json({data:del_id(getdata)});       
     });
@@ -336,17 +349,20 @@
 
 
     app.get('/users', function(req, res){
-        db.connect('db', ['userdb']);
+        //db.connect('db', ['userdb']);
         //console.log(db.users.find());
-        res.send(db.userdb.find());
+        res.send('getUsers');
     });
 
     app.put('/users/:id', function(req, res) {
-        db.connect('db', ['userdb']);
+
+        // db.connect('db', ['userdb']);
         var putdata = req.body;
         putdata.on_err=false;
         putdata.err_msg={};
         var queryuser = {id:Number(req.params.id)};
+        userdb.connect('db', ['userdb']);
+        var udata=userdb.userdb.findOne(queryuser);
         // console.log(query);
         
         db.connect('db', ['baydb']);
@@ -357,11 +373,14 @@
         if (fdata){
           putdata.bayid=fdata.id;
           if (!fdata.people){fdata.people=[]};
-          fdata.people.push(queryuser);
-          db.baydb.update(querybay,{people:fdata.people});
-          db.connect('db', ['userdb']);
+          var pushcheck=fdata.people.find(function(f){return f._id===udata._id});
+          if (!pushcheck){
+            fdata.people.push({id:Number(req.params.id),_id:udata._id});
+            db.baydb.update(querybay,{people:fdata.people});
+          }
+          // db.connect('db', ['userdb']);
           // console.log(putdata);
-          db.userdb.update(queryuser,
+          userdb.userdb.update(queryuser,
             {bayid:fdata.id},
             {avatar:putdata.avatar},
             {updatetime:putdata.updatetime}
@@ -370,12 +389,13 @@
           putdata.on_err=true;
           putdata.err_msg.invitekey_err='邀请码无效';
         }
+        // if(putdata._id){console.log('yes');};
+        // putdata= db.userdb.findOne(queryuser);
 
-        
-        // var getdata = db.userdb.findOne(queryuser);
-        // getdata.on_err=putdata.on_err;
-        // getdata.err_msg=putdata.err_msg;
-        // console.log(getdata);
+        // // var getdata = db.userdb.findOne(queryuser);
+        // // getdata.on_err=putdata.on_err;
+        // // getdata.err_msg=putdata.err_msg;
+        // console.log(putdata);
         res.json({data:del_id(putdata)}); 
     });
 
@@ -416,9 +436,13 @@
             console.log(newuser);
 
             postw._id=newuser._id;
-            fdata.people.push({id:postw.id,_id:postw._id});
-            db.connect('db', ['baydb']);
-            db.baydb.update(query,{people:fdata.people});
+            var pushcheck=fdata.people.find(function(f){return f._id===postw._id});
+            if(!pushcheck){
+              fdata.people.push({id:postw.id,_id:postw._id});
+              db.connect('db', ['baydb']);
+              db.baydb.update(query,{people:fdata.people});       
+            }
+            
           }else{
             postw.on_err=true;
             postw.err_msg.invitekey_err='邀请码无效';
@@ -447,20 +471,25 @@
         res.send({data:del_id(rstory)});
     });
 
+
     // /files/* is accessed via req.params[0]
     // but here we name it :file
     app.get('/:file(*)', function(req, res, next){
       var file = req.params.file;
       var path = __dirname + '/' + file;
       var folder1 = file.match(/[^\\\/]+/);
-      switch (folder1.toString())
-      {
-        case 'works':
-        case 'uploads':
-            console.log(path+' download!');
-            res.download(path);
-            break;
+      if (folder1){
+        switch (folder1.toString())
+          {
+            case 'works':
+            case 'uploads':
+                console.log(path+' download!');
+                res.download(path);
+                break;
+          }
+
       }
+      
     });
 
     app.delete('/delconvf', function(req, res){
@@ -500,3 +529,9 @@
     app.listen('3200', function(){
         console.log('running on 3200...');
     });
+
+    httpsServer.listen('3201', function() {
+        console.log('HTTPS Server is running on:3201...');
+    });
+
+    
