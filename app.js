@@ -10,19 +10,20 @@
     var tar = require('tar');
     var db = require('diskdb');
     var userdb = require('diskdb');
+    
     var https = require('https');
-    var privateKey  = fs.readFileSync('/etc/nginx/cert/214053462170887.key', 'utf8');
-    var certificate = fs.readFileSync('/etc/nginx/cert/214053462170887.pem', 'utf8');
-    var credentials = {key: privateKey, cert: certificate};
-    var httpsServer = https.createServer(credentials, app);
-    // var iconv = require('iconv-lite');
+    //var privateKey  = fs.readFileSync('/etc/nginx/cert/214053462170887.key', 'utf8');
+    //var certificate = fs.readFileSync('/etc/nginx/cert/214053462170887.pem', 'utf8');
+    //var credentials = {key: privateKey, cert: certificate};
+    //var httpsServer = https.createServer(credentials, app);
+    var iconv = require('iconv-lite');
 
 
 
     app.use(function(req, res, next) { //allow cross origin requests
         res.setHeader("Access-Control-Allow-Methods", "POST, PUT, OPTIONS, DELETE, GET");
-        //res.header("Access-Control-Allow-Origin", "http://localhost:4200");
-         res.header("Access-Control-Allow-Origin", "https://www.starstech.tech");
+        res.header("Access-Control-Allow-Origin", "http://localhost:4200");
+        //res.header("Access-Control-Allow-Origin", "https://www.starstech.tech");
         res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
         res.header("Access-Control-Allow-Credentials", true);
         next();
@@ -90,11 +91,32 @@
 	          return f.delflag!==true; 
 	        });
         }
-        	
-        // console.log(getdata.storys);
-  
         res.json({data:del_id(getdata)});       
-        
+    });
+
+    app.get('/delbay', function(req, res){
+      var indata = JSON.parse(req.query.user);
+      db.connect('db', ['storydb']);
+      var query = {bayid:Number(indata.bayid)};
+      var storyarr = db.storydb.find(query);
+
+        db.connect('db', ['baydb']);
+        query = {id:Number(indata.bayid)};
+        var getdata = db.baydb.findOne(query); 
+        //console.log(getdata.storys);
+        if (getdata){
+            if(!getdata.storys){getdata.storys=[]};
+            getdata.storys.forEach(function(baysty,index){
+              getdata.storys[index]=storyarr.find(function(fsty){return fsty.id===baysty.id;}); 
+              //console.log(getdata.storys[index],index);
+            });
+            //console.log(getdata.storys);
+            getdata.storys=getdata.storys.filter(function(f){
+              //console.log(f);
+              return f.delflag===true; 
+            });
+        }
+        res.json({data:del_id(getdata)});       
     });
 
     app.put('/bay/:id', function(req, res) {
@@ -176,6 +198,34 @@
         findbay.storys.push({id:Number(postw.id),_id:newstory._id});
         
         db.baydb.update(query,{storys:findbay.storys});
+        // console.log(db.baydb.find());
+        res.json({data:del_id(postw)});   
+    });
+
+    //Update story
+    app.put('/story', function(req, res) {
+        db.connect('db', ['storydb']);
+        //console.log(req.body); 
+        var postw = req.body; 
+        // postw.id = db.storydb.count() + 1;
+        // postw.description=postw.description.replace(/\n/g,'\r\n');
+        postw.delflag=false;
+        var querystory={id:postw.id}
+        db.storydb.update(querystory,postw,{upsert: true});
+        var oldstory=db.storydb.findOne(querystory);
+        db.connect('db', ['baydb']);
+        var query = {id:Number(postw.bayid)};
+        var findbay= db.baydb.findOne(query);
+        // console.log(postw);
+        // console.log(findbay);
+        // console.log(query);
+        // console.log(db.baydb.findOne());
+        if(!findbay.storys){findbay.storys=[]};
+        var pushcheck=findbay.storys.find(function(f){return f._id===oldstory._id});
+        if (!pushcheck){
+          findbay.storys.push({id:Number(postw.id),_id:oldstory._id});
+          db.baydb.update(query,{storys:findbay.storys});
+        }
         // console.log(db.baydb.find());
         res.json({data:del_id(postw)});   
     });
@@ -380,11 +430,20 @@
           }
           // db.connect('db', ['userdb']);
           // console.log(putdata);
+          // console.log(queryuser);
           userdb.userdb.update(queryuser,
-            {bayid:fdata.id},
-            {avatar:putdata.avatar},
-            {updatetime:putdata.updatetime}
+            {bayid:fdata.id,
+            avatar:putdata.avatar,
+            updatetime:putdata.updatetime}
           );
+          //console.log(userdb.userdb.findOne(queryuser));
+          // db.connect('db', ['userdb']);
+          // db.userdb.update(queryuser,
+          //   {bayid:fdata.id},
+          //   {avatar:putdata.avatar},
+          //   {updatetime:putdata.updatetime}
+          // );
+          // console.log(db.userdb.findOne(queryuser));
         }else{
           putdata.on_err=true;
           putdata.err_msg.invitekey_err='邀请码无效';
@@ -530,8 +589,8 @@
         console.log('running on 3200...');
     });
 
-    httpsServer.listen('3201', function() {
-        console.log('HTTPS Server is running on:3201...');
-    });
+    // httpsServer.listen('3201', function() {
+    //     console.log('HTTPS Server is running on:3201...');
+    // });
 
     
