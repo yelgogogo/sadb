@@ -1,3 +1,4 @@
+    // "use strict";
     var express = require('express'); 
     var app = express(); 
     var bodyParser = require('body-parser');
@@ -11,11 +12,12 @@
     var db = require('diskdb');
     var userdb = require('diskdb');
     
-    var https = require('https');
-    //var privateKey  = fs.readFileSync('/etc/nginx/cert/214053462170887.key', 'utf8');
-    //var certificate = fs.readFileSync('/etc/nginx/cert/214053462170887.pem', 'utf8');
-    //var credentials = {key: privateKey, cert: certificate};
-    //var httpsServer = https.createServer(credentials, app);
+    // var https = require('https');
+    // var privateKey  = fs.readFileSync('/etc/nginx/cert/214053462170887.key', 'utf8');
+    // var certificate = fs.readFileSync('/etc/nginx/cert/214053462170887.pem', 'utf8');
+    // var credentials = {key: privateKey, cert: certificate};
+    // var httpsServer = https.createServer(credentials, app);
+
     var iconv = require('iconv-lite');
 
 
@@ -23,7 +25,7 @@
     app.use(function(req, res, next) { //allow cross origin requests
         res.setHeader("Access-Control-Allow-Methods", "POST, PUT, OPTIONS, DELETE, GET");
         res.header("Access-Control-Allow-Origin", "http://localhost:4200");
-        //res.header("Access-Control-Allow-Origin", "https://www.starstech.tech");
+        //res.header("Access-Control-Allow-Origin", "https://www.starstech.cc");
         res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
         res.header("Access-Control-Allow-Credentials", true);
         next();
@@ -205,18 +207,18 @@
     //Update story
     app.put('/story', function(req, res) {
         db.connect('db', ['storydb']);
-        //console.log(req.body); 
+        
         var postw = req.body; 
-        // postw.id = db.storydb.count() + 1;
-        // postw.description=postw.description.replace(/\n/g,'\r\n');
         postw.delflag=false;
         var querystory={id:postw.id}
+        console.log(postw);
         db.storydb.update(querystory,postw,{upsert: true});
         var oldstory=db.storydb.findOne(querystory);
+        console.log(oldstory);
         db.connect('db', ['baydb']);
-        var query = {id:Number(postw.bayid)};
+        var query = {id:Number(oldstory.bayid)};
         var findbay= db.baydb.findOne(query);
-        // console.log(postw);
+        
         // console.log(findbay);
         // console.log(query);
         // console.log(db.baydb.findOne());
@@ -230,9 +232,18 @@
         res.json({data:del_id(postw)});   
     });
 
+    function getClientIp(req) {
+        //console.log(req.connection.socket.remoteAddress);
+        return req.headers['x-forwarded-for'] ||
+        req.connection.remoteAddress ||
+        req.socket.remoteAddress ||
+        req.connection.socket.remoteAddress;
+    };
+
     app.get('/storybyid', function(req, res){
         var indata = JSON.parse(req.query.id);
-
+        //console.log(getClientIp(req)); 
+        let visitorip=getClientIp(req);
         db.connect('db', ['commentdb']);
         var querycomment = {storyid:Number(indata.id)};
         commentarr=db.commentdb.find(querycomment);
@@ -240,9 +251,17 @@
         db.connect('db', ['storydb']);
         // console.log(db.storydb.findOne({id:indata.id,delflag:false}));
         // var rdata=db.storydb.findOne();
-        var querystory={id:indata.id,delflag:false};
+        var querystory={id:indata.id};
 
         var getdata = db.storydb.findOne(querystory); 
+        if(!getdata.visitors){getdata.visitors=[]};
+        // var pushcheck=getdata.visitors.find(function(f){return f===visitorip});
+        //   if (!pushcheck){
+            getdata.visitors.push(visitorip);
+            db.storydb.update(querystory,{visitors:getdata.visitors});
+            getdata = db.storydb.findOne(querystory); 
+          // }
+        //console.log(getdata.visitors); 
         // console.log(getdata.comments);
         if (getdata){
             getdata.comments.forEach(function(baysty,index){
@@ -296,11 +315,32 @@
 
     });
 
-    //add new story
+    //push new like
+    app.put('/like', function(req, res) {
+        let postw = req.body; 
+        // let visitorip=getClientIp(req);
+        db.connect('db', ['storydb']);
+        var query = {id:postw.id};
+        let findstory= db.storydb.findOne(query);
+        if(findstory.likes){
+            let findlike=findstory.likes.find(f=>f.id===postw.likes[0].id);
+            if(!findlike){
+                findstory.likes=findstory.likes.concat(postw.likes);
+            }
+        }else{
+            findstory.likes=postw.likes;
+        }
+        // console.log(findbay.storys);
+        //db.connect('db', ['storydb']);
+        db.storydb.update(query,{likes:findstory.likes});
+        findstory= db.storydb.findOne(query);
+        // console.log(db.baydb.find());
+        res.json({data:del_id(findstory)});   
+    });
+
+    //add new comment
     app.post('/comment', function(req, res) {
         var postw = req.body; 
-
-        
         db.connect('db', ['storydb']);
         var query = {id:postw.storyid};
         var findstory= db.storydb.findOne(query);
@@ -321,8 +361,6 @@
         db.connect('db', ['storydb']);
         db.storydb.update(query,{comments:findstory.comments});
         // console.log(db.baydb.find());
-        
-
         res.json({data:del_id(findstory)});   
     });
 
@@ -434,6 +472,7 @@
           userdb.userdb.update(queryuser,
             {bayid:fdata.id,
             avatar:putdata.avatar,
+            moneyimg:putdata.moneyimg,
             updatetime:putdata.updatetime}
           );
           //console.log(userdb.userdb.findOne(queryuser));

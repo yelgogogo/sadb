@@ -10,7 +10,7 @@ gulp.task('lint', function() {
 	
 	// run server 
 gulp.task( 'server:start', function() {
-    server.listen( { path: './app.js' } );
+    server.listen( { path: './app.js',execArgv: [ '--harmony' ] } );
 });
  
 // restart server if app.js changed 
