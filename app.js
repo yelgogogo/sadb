@@ -11,7 +11,11 @@
     var tar = require('tar');
     var db = require('diskdb');
     var userdb = require('diskdb');
+    var configdb = require('diskdb');
     
+    const request = require('request');
+    const qs = require('querystring');
+
     // var https = require('https');
     // var privateKey  = fs.readFileSync('/etc/nginx/cert/214053462170887.key', 'utf8');
     // var certificate = fs.readFileSync('/etc/nginx/cert/214053462170887.pem', 'utf8');
@@ -300,16 +304,6 @@
 	  }
       
       deldata = db.storydb.findOne(query);
-      // db.connect('db', ['baydb']);
-      // var query = {id:Number(deldata.bayid)};
-      // var findbay= db.baydb.findOne(query);
-      // var i=findbay.storys.findIndex(
-      // 	function(x) { return x.id === deldata.id; }
-      // 	);
-      // console.log(i);
-      // findbay.storys[i]=deldata;
-      // db.baydb.update(query,{storys:findbay.storys});
-      // console.log(db.baydb.findOne(query).storys[i]);
       res.json({data:del_id(deldata)}); 
       
 
@@ -498,11 +492,17 @@
     });
 
     app.get('/userbyname', function(req, res){
-        var indata = JSON.parse(req.query.user);
+        let indata = JSON.parse(req.query.user);
         db.connect('db', ['userdb']);
         //console.log(db.userdb.findOne({name:indata.name,password:indata.password}));
-        var rdata=db.userdb.findOne({name:indata.name,password:indata.password});
-        delete rdata.password;
+        let rdata=db.userdb.findOne({name:indata.name,password:indata.password});
+        if(rdata){
+          if (rdata.badge===undefined){
+            rdata.badge=1;
+          }
+          delete rdata.password;
+        }
+        
         res.send({data:del_id(rdata)});
     });  
 
@@ -569,6 +569,90 @@
         res.send({data:del_id(rstory)});
     });
 
+    //getWebToken
+    function getToken(code,appid,secret) {
+      let reqUrl = 'https://api.weixin.qq.com/sns/oauth2/access_token?';
+      let params = {
+        appid: appid,
+        secret: secret,
+        code: code,
+        grant_type: 'authorization_code'
+      };
+
+      let options = {
+        method: 'get',
+        url: reqUrl+qs.stringify(params)
+      };
+      console.log(options.url);
+      return new Promise((resolve, reject) => {
+        request(options, function (err, res, body) {
+          if (res) {
+            resolve(body);
+          } else {
+            reject(err);
+          }
+        })
+      })
+    }
+
+    //getUserInfo
+    function getUserInfo(access_token, openid) {
+      let reqUrl = 'https://api.weixin.qq.com/sns/userinfo?';
+      let params = {
+        access_token: access_token,
+        openid: openid,
+        lang: 'zh_CN'
+      };
+
+      let options = {
+        method: 'get',
+        url: reqUrl+qs.stringify(params)
+      };
+      
+      return new Promise((resolve, reject) => {
+        request(options, function (err, res, body) {
+          if (res) {
+            resolve(body);
+          } else {
+            reject(err);
+          }
+        });
+      })
+    }
+
+    // function handleError(error: any): {
+    //     console.error('An error occurred', error);
+    //     return Promise.reject(error.message || error);
+    // }
+
+    app.get('/wxuser', function(req, res){
+      console.log('getwx');
+      let indata = JSON.parse(req.query.data);
+      let code = indata.code;
+      // let appid = 'wxd97ecfda77d6b9ae';
+      // let secret = 'efb906c4c7b0d2a10e2d52745b4f75fd';
+      configdb.connect('db', ['configdb']);
+      let config=configdb.configdb.findOne();
+      getToken(code,config.appid,config.secret)
+        .then(r=>{
+          console.log(r);
+          let robj=JSON.parse(r);
+          getUserInfo(robj.access_token,robj.openid)
+            .then(r2=>{
+              res.send({data:del_id(JSON.parse(r2))});
+            })
+            .catch(e=>console.log(e));
+        })
+        .catch(e=>console.log(e));
+       
+      //console.log(wxinfo);
+      
+      // db.connect('db', ['storydb']);
+      // var query = {bayid:Number(indata.bayid)};
+      // var storyarr = db.storydb.find(query);
+
+      //   db.connect('db', ['baydb']);
+    });
 
     // /files/* is accessed via req.params[0]
     // but here we name it :file
@@ -623,6 +707,9 @@
         // filer.convFlag = false;
         // res.send(filer);
     });
+
+
+
 
     app.listen('3200', function(){
         console.log('running on 3200...');
