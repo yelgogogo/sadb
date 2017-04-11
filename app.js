@@ -629,8 +629,6 @@
       console.log('getwx');
       let indata = JSON.parse(req.query.data);
       let code = indata.code;
-      // let appid = 'wxd97ecfda77d6b9ae';
-      // let secret = 'efb906c4c7b0d2a10e2d52745b4f75fd';
       configdb.connect('db', ['configdb']);
       let config=configdb.configdb.findOne();
       getToken(code,config.appid,config.secret)
