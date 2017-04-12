@@ -492,13 +492,41 @@
     });
 
     app.get('/userbyname', function(req, res){
-        let indata = JSON.parse(req.query.user);
-        db.connect('db', ['userdb']);
+        let user = JSON.parse(req.query.user);
+        userdb.connect('db', ['userdb']);
+        let query1={name:user.name,password:user.password};
         //console.log(db.userdb.findOne({name:indata.name,password:indata.password}));
-        let rdata=db.userdb.findOne({name:indata.name,password:indata.password});
+        let rdata=userdb.userdb.findOne(query1);
         if(rdata){
           if (rdata.badge===undefined){
             rdata.badge=1;
+          }
+          if(user.openid){
+            let updatedata={
+              openid:user.openid,
+              nickname:user.nickname,
+              sex:user.sex,
+              province:user.province,
+              city:user.city,
+              country:user.country,
+              headimgurl:user.headimgurl,
+              avatar:user.avatar,
+              privilege:user.privilege
+            };
+
+            let query2={openid:user.openid};
+       
+
+            userdb.userdb.update(query2,{openid:''},{multi: false});
+    
+            //console.log(userdb.userdb.findOne(query1));
+            userdb.userdb.update({_id:rdata._id},updatedata,{upsert: true});
+            //console.log(userdb.userdb.findOne(query1));
+            rdata=userdb.userdb.findOne(query1);
+            //console.log(userdb.userdb.findOne(query2));
+            //console.log(updatedata);
+            //console.log(query1);
+            //console.log(rdata);
           }
           delete rdata.password;
         }
@@ -627,29 +655,47 @@
 
     app.get('/wxuser', function(req, res){
       console.log('getwx');
+      userdb.connect('db', ['userdb']);
+      configdb.connect('db', ['configdb']);
+      //  console.log(userdb.userdb.find());
+      // console.log(userdb.userdb.findOne());
       let indata = JSON.parse(req.query.data);
       let code = indata.code;
+      let user = JSON.parse(indata.user);
+
       configdb.connect('db', ['configdb']);
       let config=configdb.configdb.findOne();
       getToken(code,config.appid,config.secret)
         .then(r=>{
           console.log(r);
           let robj=JSON.parse(r);
-          getUserInfo(robj.access_token,robj.openid)
-            .then(r2=>{
-              res.send({data:del_id(JSON.parse(r2))});
-            })
-            .catch(e=>console.log(e));
+          let query1={openid:robj.openid};
+          console.log(query1);
+          let rtnuser=userdb.userdb.findOne(query1);
+          if(rtnuser){
+            res.send({data:del_id(rtnuser)});
+          }else{
+            getUserInfo(robj.access_token,robj.openid)
+              .then(r2=>{
+                let r2obj=JSON.parse(r2);
+                if (r2obj.errcode){
+
+                }else{
+                    let query={id:user.id};
+                    r2obj.avatar=r2obj.headimgurl;
+                    console.log(user);
+                    console.log(r2obj);
+                    userdb.userdb.update(query,user,{upsert: true});
+                    userdb.userdb.update(query,r2obj,{upsert: true});
+                    rtnuser=userdb.userdb.findOne(query);
+                    res.send({data:del_id(rtnuser)});
+                }
+                
+              })
+              .catch(e=>console.log(e));      
+          }
         })
         .catch(e=>console.log(e));
-       
-      //console.log(wxinfo);
-      
-      // db.connect('db', ['storydb']);
-      // var query = {bayid:Number(indata.bayid)};
-      // var storyarr = db.storydb.find(query);
-
-      //   db.connect('db', ['baydb']);
     });
 
     // /files/* is accessed via req.params[0]
@@ -663,7 +709,7 @@
           {
             case 'works':
             case 'uploads':
-                console.log(path+' download!');
+                //console.log(path+' download!');
                 res.download(path);
                 break;
           }
