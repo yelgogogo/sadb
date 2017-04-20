@@ -16,19 +16,25 @@
     const request = require('request');
     const qs = require('querystring');
 
-    // var https = require('https');
-    // var privateKey  = fs.readFileSync('/etc/nginx/cert/214053462170887.key', 'utf8');
-    // var certificate = fs.readFileSync('/etc/nginx/cert/214053462170887.pem', 'utf8');
-    // var credentials = {key: privateKey, cert: certificate};
-    // var httpsServer = https.createServer(credentials, app);
+    const env = 'test';
+
+    if (env === 'prod'){
+        var https = require('https');
+        var privateKey  = fs.readFileSync('/etc/nginx/cert/214053462170887.key', 'utf8');
+        var certificate = fs.readFileSync('/etc/nginx/cert/214053462170887.pem', 'utf8');
+        var credentials = {key: privateKey, cert: certificate};
+        var httpsServer = https.createServer(credentials, app);
+    }
 
     var iconv = require('iconv-lite');
 
-
-
     app.use(function(req, res, next) { //allow cross origin requests
         res.setHeader("Access-Control-Allow-Methods", "POST, PUT, OPTIONS, DELETE, GET");
-        res.header("Access-Control-Allow-Origin", "http://localhost:4200");
+        let weburl="http://localhost:4200";
+        if (env === 'prod'){
+            weburl="https://www.starstech.cc";
+        }
+        res.header("Access-Control-Allow-Origin", weburl);
         //res.header("Access-Control-Allow-Origin", "https://www.starstech.cc");
         res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
         res.header("Access-Control-Allow-Credentials", true);
@@ -145,7 +151,7 @@
           postw.on_err=true;
           postw.err_msg='你只能拥有一个港口';     
         }else{
-          postw.id = db.baydb.count() + 1;
+          postw.id = Date.now();
           db.baydb.save(postw);  
           postw=db.baydb.findOne({id:Number(postw.id)});
           console.log(postw);
@@ -188,7 +194,7 @@
         db.connect('db', ['storydb']);
         //console.log(req.body); 
         var postw = req.body; 
-        postw.id = db.storydb.count() + 1;
+        postw.id = Date.now();
         // postw.description=postw.description.replace(/\n/g,'\r\n');
         db.storydb.save(postw);
         var querystory={id:postw.id}
@@ -491,6 +497,20 @@
         res.json({data:del_id(putdata)}); 
     });
 
+    // app.get('/testu', function(req, res){
+    //     userdb.connect('db', ['testdb']);
+    //     userdb.testdb.remove();
+    //     userdb.connect('db', ['testdb']);
+    //     let user1={name:'mic',pw:'',mark:'user1'}
+    //     let user2={name:'mic2',pw:'',mark:'user2'}
+    //     userdb.testdb.save([user1,user2]);
+    //     let query1={name:user1.name,pw:user1.pw}
+    //     let query2={mark:user2.mark}
+    //     userdb.testdb.update(query2,{mark:''});
+    //     userdb.testdb.update(query1,{mark:'change1'});
+    //     res.send(userdb.testdb.find());
+    // });
+
     app.get('/userbyname', function(req, res){
         let user = JSON.parse(req.query.user);
         userdb.connect('db', ['userdb']);
@@ -513,15 +533,18 @@
               avatar:user.avatar,
               privilege:user.privilege
             };
-
+   
             let query2={openid:user.openid};
        
-
+            // console.log(query1);
+            // console.log(query2);
             userdb.userdb.update(query2,{openid:''},{multi: false});
-    
-            //console.log(userdb.userdb.findOne(query1));
+            // console.log(userdb.userdb.find(query1));
+            // console.log(userdb.userdb.find(query2));
             userdb.userdb.update({_id:rdata._id},updatedata,{upsert: true});
-            //console.log(userdb.userdb.findOne(query1));
+            //userdb.userdb.update(query1,updatedata,{upsert: true});
+            // console.log(userdb.userdb.find(query1));
+            // console.log(userdb.userdb.find(query2));
             rdata=userdb.userdb.findOne(query1);
             //console.log(userdb.userdb.findOne(query2));
             //console.log(updatedata);
@@ -547,7 +570,7 @@
           postw.on_err=true;
           postw.err_msg.nickname_err='昵称已存在';
         }else{
-          postw.id = db.userdb.count() + 1;
+          postw.id = Date.now();
         
           db.connect('db', ['baydb']);
           var query = {invitekey:postw.invitekey};
@@ -682,7 +705,7 @@
 
                 }else{
                     let query={id:user.id};
-                    r2obj.avatar=r2obj.headimgurl;
+                    r2obj.avatar=r2obj.headimgurl.replace(/http\:/, "https:");
                     console.log(user);
                     console.log(r2obj);
                     userdb.userdb.update(query,user,{upsert: true});
@@ -759,8 +782,10 @@
         console.log('running on 3200...');
     });
 
-    // httpsServer.listen('3201', function() {
-    //     console.log('HTTPS Server is running on:3201...');
-    // });
+if (env === 'prod'){
+    httpsServer.listen('3201', function() {
+        console.log('HTTPS Server is running on:3201...');
+    });
+}
 
     
